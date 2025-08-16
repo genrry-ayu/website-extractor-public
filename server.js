@@ -1343,10 +1343,11 @@ app.post('/api/config', async (req, res) => {
     }
 });
 
-// 健康检查端点
+// 健康检查接口
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
+        message: '社交媒体链接提取器运行正常',
         timestamp: new Date().toISOString()
     });
 });
@@ -1354,6 +1355,11 @@ app.get('/api/health', (req, res) => {
 // 根路径返回主页
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// 配置页面路由
+app.get('/config', (req, res) => {
+    res.sendFile(path.join(__dirname, 'config.html'));
 });
 
 // 飞书API相关函数
