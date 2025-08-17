@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试 Netlify Function</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>测试 Netlify Function</h1>
+    
+    <div class="test-section">
+        <h3>测试 Function 连接</h3>
+        <button onclick="testFunction()">测试 Function</button>
+        <div id="functionResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>测试网站提取</h3>
+        <input type="url" id="testUrl" placeholder="输入测试URL" value="https://example.com" style="width: 300px; padding: 5px;">
+        <button onclick="testExtraction()">测试提取</button>
+        <div id="extractionResult" class="result"></div>
+    </div>
+
+    <script>
+        async function testFunction() {
+            const resultDiv = document.getElementById('functionResult');
+            resultDiv.textContent = '测试中...';
+            
+            try {
+                const response = await fetch('/.netlify/functions/extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: 'https://example.com' })
+                });
+                
+                const data = await response.json();
+                resultDiv.textContent = `状态: ${response.status}\n响应: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                resultDiv.textContent = `错误: ${error.message}`;
+            }
+        }
+        
+        async function testExtraction() {
+            const url = document.getElementById('testUrl').value;
+            const resultDiv = document.getElementById('extractionResult');
+            resultDiv.textContent = '提取中...';
+            
+            try {
+                const response = await fetch('/.netlify/functions/extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                const data = await response.json();
+                resultDiv.textContent = `状态: ${response.status}\n响应: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                resultDiv.textContent = `错误: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
