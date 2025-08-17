@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一键部署到 Railway</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            color: white;
+        }
+        .deploy-button {
+            display: inline-block;
+            background: #00d4aa;
+            color: white;
+            padding: 20px 40px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 212, 170, 0.3);
+        }
+        .deploy-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0, 212, 170, 0.4);
+        }
+        .steps {
+            text-align: left;
+            margin-top: 40px;
+        }
+        .step {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .step h3 {
+            color: #00d4aa;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 一键部署到 Railway</h1>
+        <p>网站信息提取器 - 简单、快速、可靠</p>
+        
+        <a href="https://railway.app/template/new?template=https://github.com/genrryli/website-extractor-public" 
+           class="deploy-button" target="_blank">
+            🚀 立即部署
+        </a>
+        
+        <div class="steps">
+            <div class="step">
+                <h3>步骤 1</h3>
+                <p>点击上面的"立即部署"按钮</p>
+            </div>
+            <div class="step">
+                <h3>步骤 2</h3>
+                <p>使用 GitHub 账号登录 Railway</p>
+            </div>
+            <div class="step">
+                <h3>步骤 3</h3>
+                <p>等待 2-3 分钟完成部署</p>
+            </div>
+            <div class="step">
+                <h3>步骤 4</h3>
+                <p>访问生成的域名开始使用</p>
+            </div>
+        </div>
+        
+        <p style="margin-top: 40px; font-size: 0.9em; opacity: 0.8;">
+            部署完成后，你将获得一个类似 <code>https://your-app-name.railway.app</code> 的域名
+        </p>
+    </div>
+</body>
+</html>
