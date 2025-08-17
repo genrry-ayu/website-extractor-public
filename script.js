@@ -22,6 +22,16 @@ class WebsiteExtractor {
         });
     }
 
+    // 检测当前环境并返回正确的API端点
+    getApiEndpoint() {
+        // 检查是否在 Netlify 环境
+        if (window.location.hostname.includes('netlify.app')) {
+            return '/.netlify/functions/extract';
+        }
+        // 本地环境
+        return '/api/extract';
+    }
+
     async extractLinks() {
         const urlInput = document.getElementById('urlInput');
         const url = urlInput.value.trim();
@@ -42,7 +52,10 @@ class WebsiteExtractor {
         this.showLoading();
 
         try {
-            const response = await fetch('/api/extract', {
+            const apiEndpoint = this.getApiEndpoint();
+            console.log('使用API端点:', apiEndpoint);
+            
+            const response = await fetch(apiEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
