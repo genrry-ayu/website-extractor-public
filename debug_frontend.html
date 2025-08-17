@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端调试页面</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; }
+        input { padding: 8px; width: 300px; }
+        #log { background: #f8f9fa; padding: 10px; height: 200px; overflow-y: scroll; }
+    </style>
+</head>
+<body>
+    <h1>前端功能调试</h1>
+    
+    <div class="debug-section info">
+        <h3>1. 基本功能测试</h3>
+        <button onclick="testBasicFunctions()">测试基本功能</button>
+        <div id="basicTest"></div>
+    </div>
+
+    <div class="debug-section info">
+        <h3>2. API接口测试</h3>
+        <input type="url" id="testUrl" placeholder="输入测试URL" value="https://example.com">
+        <button onclick="testAPI()">测试API</button>
+        <div id="apiTest"></div>
+    </div>
+
+    <div class="debug-section info">
+        <h3>3. 本地存储测试</h3>
+        <button onclick="testLocalStorage()">测试本地存储</button>
+        <div id="storageTest"></div>
+    </div>
+
+    <div class="debug-section info">
+        <h3>4. 控制台日志</h3>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logEntry.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function testBasicFunctions() {
+            const testDiv = document.getElementById('basicTest');
+            testDiv.innerHTML = '';
+            
+            try {
+                // 测试fetch API
+                if (typeof fetch !== 'undefined') {
+                    log('✅ fetch API 可用', 'success');
+                    testDiv.innerHTML += '<div class="success">✅ fetch API 可用</div>';
+                } else {
+                    log('❌ fetch API 不可用', 'error');
+                    testDiv.innerHTML += '<div class="error">❌ fetch API 不可用</div>';
+                }
+
+                // 测试localStorage
+                if (typeof localStorage !== 'undefined') {
+                    log('✅ localStorage 可用', 'success');
+                    testDiv.innerHTML += '<div class="success">✅ localStorage 可用</div>';
+                } else {
+                    log('❌ localStorage 不可用', 'error');
+                    testDiv.innerHTML += '<div class="error">❌ localStorage 不可用</div>';
+                }
+
+                // 测试JSON
+                if (typeof JSON !== 'undefined') {
+                    log('✅ JSON 可用', 'success');
+                    testDiv.innerHTML += '<div class="success">✅ JSON 可用</div>';
+                } else {
+                    log('❌ JSON 不可用', 'error');
+                    testDiv.innerHTML += '<div class="error">❌ JSON 不可用</div>';
+                }
+
+            } catch (error) {
+                log(`❌ 基本功能测试失败: ${error.message}`, 'error');
+                testDiv.innerHTML += `<div class="error">❌ 基本功能测试失败: ${error.message}</div>`;
+            }
+        }
+
+        async function testAPI() {
+            const testDiv = document.getElementById('apiTest');
+            const url = document.getElementById('testUrl').value;
+            testDiv.innerHTML = '<div class="info">🔄 正在测试API...</div>';
+            
+            try {
+                log(`🔄 开始测试API: ${url}`, 'info');
+                
+                const response = await fetch('/api/extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                log(`📡 API响应状态: ${response.status}`, 'info');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                log(`📦 API响应数据: ${JSON.stringify(data)}`, 'success');
+
+                if (data.success) {
+                    testDiv.innerHTML = `
+                        <div class="success">
+                            ✅ API测试成功<br>
+                            公司名称: ${data.results.companyName || '未找到'}<br>
+                            描述: ${data.results.description ? data.results.description.substring(0, 100) + '...' : '未找到'}<br>
+                            Instagram: ${data.results.instagram.length} 个链接<br>
+                            Facebook: ${data.results.facebook.length} 个链接
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.error || 'API返回失败');
+                }
+
+            } catch (error) {
+                log(`❌ API测试失败: ${error.message}`, 'error');
+                testDiv.innerHTML = `<div class="error">❌ API测试失败: ${error.message}</div>`;
+            }
+        }
+
+        function testLocalStorage() {
+            const testDiv = document.getElementById('storageTest');
+            testDiv.innerHTML = '';
+            
+            try {
+                // 测试写入
+                const testData = { test: 'data', timestamp: Date.now() };
+                localStorage.setItem('test_storage', JSON.stringify(testData));
+                log('✅ 本地存储写入成功', 'success');
+                testDiv.innerHTML += '<div class="success">✅ 本地存储写入成功</div>';
+
+                // 测试读取
+                const readData = JSON.parse(localStorage.getItem('test_storage'));
+                if (readData && readData.test === 'data') {
+                    log('✅ 本地存储读取成功', 'success');
+                    testDiv.innerHTML += '<div class="success">✅ 本地存储读取成功</div>';
+                } else {
+                    throw new Error('读取的数据不正确');
+                }
+
+                // 清理测试数据
+                localStorage.removeItem('test_storage');
+                log('✅ 本地存储清理成功', 'success');
+                testDiv.innerHTML += '<div class="success">✅ 本地存储清理成功</div>';
+
+            } catch (error) {
+                log(`❌ 本地存储测试失败: ${error.message}`, 'error');
+                testDiv.innerHTML += `<div class="error">❌ 本地存储测试失败: ${error.message}</div>`;
+            }
+        }
+
+        // 页面加载时自动运行基本测试
+        window.onload = function() {
+            log('🚀 调试页面已加载', 'info');
+            testBasicFunctions();
+        };
+    </script>
+</body>
+</html>

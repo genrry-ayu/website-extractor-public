@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网站信息提取器</title>
+    <link rel="stylesheet" href="sidebar.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="sidebar-container">
+        <!-- 头部 -->
+        <header class="sidebar-header">
+            <div class="header-content">
+                <h1><i class="fas fa-link"></i> 信息提取器</h1>
+                <button id="toggleBtn" class="toggle-btn" title="切换侧边栏">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- 主要内容 -->
+        <main class="sidebar-main">
+            <!-- URL输入区域 -->
+            <div class="url-input-section">
+                <div class="input-group">
+                    <label for="urlInput">
+                        <i class="fas fa-globe"></i> 网站地址
+                    </label>
+                    <input type="url" id="urlInput" placeholder="请输入要提取信息的网站地址" />
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="action-section">
+                <button id="extractBtn" class="btn btn-primary">
+                    <i class="fas fa-search"></i> 提取信息
+                </button>
+                <button id="configBtn" class="btn btn-secondary">
+                    <i class="fas fa-cog"></i> 飞书配置
+                </button>
+            </div>
+
+            <!-- 加载状态 -->
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>正在提取信息...</p>
+            </div>
+
+            <!-- 提取结果 -->
+            <div class="results" id="results" style="display: none;">
+                <h3>提取结果</h3>
+                
+                <!-- 飞书状态 -->
+                <div class="feishu-status" id="feishuStatus" style="display: none;">
+                    <div class="feishu-success" id="feishuSuccess" style="display: none;">
+                        <i class="fas fa-check-circle"></i>
+                        <span>数据已写入飞书</span>
+                    </div>
+                    <div class="feishu-error" id="feishuError" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>写入失败</span>
+                    </div>
+                </div>
+
+                <!-- 信息展示 -->
+                <div class="info-sections">
+                    <!-- 基本信息 -->
+                    <div class="info-section">
+                        <h4><i class="fas fa-building"></i> 基本信息</h4>
+                        <div class="info-item">
+                            <label>公司名</label>
+                            <span id="companyName">未找到</span>
+                        </div>
+                        <div class="info-item">
+                            <label>简介</label>
+                            <span id="description">未找到</span>
+                        </div>
+                    </div>
+
+                    <!-- 联系信息 -->
+                    <div class="info-section">
+                        <h4><i class="fas fa-address-book"></i> 联系信息</h4>
+                        <div class="info-item">
+                            <label>地址</label>
+                            <span id="address">未找到</span>
+                        </div>
+                        <div class="info-item">
+                            <label>邮箱</label>
+                            <span id="email">未找到</span>
+                        </div>
+                        <div class="info-item">
+                            <label>电话</label>
+                            <span id="phone">未找到</span>
+                        </div>
+                    </div>
+
+                    <!-- 社交媒体 -->
+                    <div class="info-section">
+                        <h4><i class="fas fa-share-alt"></i> 社交媒体</h4>
+                        <div class="info-item">
+                            <label>Instagram</label>
+                            <span id="instagram">未找到</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Facebook</label>
+                            <span id="facebook">未找到</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="result-actions">
+                    <button id="copyBtn" class="btn btn-small">
+                        <i class="fas fa-copy"></i> 复制结果
+                    </button>
+                    <button id="saveBtn" class="btn btn-small btn-primary">
+                        <i class="fas fa-save"></i> 保存到飞书
+                    </button>
+                </div>
+            </div>
+
+            <!-- 历史记录 -->
+            <div class="history-section" id="historySection" style="display: none;">
+                <h3>历史记录</h3>
+                <div class="history-list" id="historyList">
+                    <!-- 历史记录项将动态添加 -->
+                </div>
+            </div>
+        </main>
+
+        <!-- 底部 -->
+        <footer class="sidebar-footer">
+            <div class="footer-actions">
+                <button id="historyBtn" class="btn btn-small">
+                    <i class="fas fa-history"></i> 历史
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script src="sidebar.js"></script>
+</body>
+</html>

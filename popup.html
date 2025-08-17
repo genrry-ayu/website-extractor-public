@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网站信息提取器</title>
+    <link rel="stylesheet" href="popup.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="popup-container">
+        <header class="popup-header">
+            <h1><i class="fas fa-link"></i> 信息提取器</h1>
+            <p>智能提取当前网页信息</p>
+        </header>
+
+        <main class="popup-main">
+            <!-- 当前网站信息 -->
+            <div class="current-site">
+                <div class="site-info">
+                    <i class="fas fa-globe"></i>
+                    <span id="currentUrl">正在获取...</span>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+                <button id="extractBtn" class="btn btn-primary">
+                    <i class="fas fa-search"></i> 提取信息
+                </button>
+                <button id="configBtn" class="btn btn-secondary">
+                    <i class="fas fa-cog"></i> 飞书配置
+                </button>
+            </div>
+
+            <!-- 加载状态 -->
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>正在提取信息...</p>
+            </div>
+
+            <!-- 提取结果 -->
+            <div class="results" id="results" style="display: none;">
+                <h3>提取结果</h3>
+                
+                <!-- 飞书状态 -->
+                <div class="feishu-status" id="feishuStatus" style="display: none;">
+                    <div class="feishu-success" id="feishuSuccess" style="display: none;">
+                        <i class="fas fa-check-circle"></i>
+                        <span>数据已写入飞书</span>
+                    </div>
+                    <div class="feishu-error" id="feishuError" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>写入失败</span>
+                    </div>
+                </div>
+
+                <!-- 信息展示 -->
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label><i class="fas fa-building"></i> 公司名</label>
+                        <span id="companyName">未找到</span>
+                    </div>
+                    <div class="info-item">
+                        <label><i class="fas fa-info-circle"></i> 简介</label>
+                        <span id="description">未找到</span>
+                    </div>
+                    <div class="info-item">
+                        <label><i class="fas fa-map-marker-alt"></i> 地址</label>
+                        <span id="address">未找到</span>
+                    </div>
+                    <div class="info-item">
+                        <label><i class="fas fa-envelope"></i> 邮箱</label>
+                        <span id="email">未找到</span>
+                    </div>
+                    <div class="info-item">
+                        <label><i class="fas fa-phone"></i> 电话</label>
+                        <span id="phone">未找到</span>
+                    </div>
+                    <div class="info-item">
+                        <label><i class="fab fa-instagram"></i> Instagram</label>
+                        <span id="instagram">未找到</span>
+                    </div>
+                    <div class="info-item">
+                        <label><i class="fab fa-facebook"></i> Facebook</label>
+                        <span id="facebook">未找到</span>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="result-actions">
+                    <button id="copyBtn" class="btn btn-small">
+                        <i class="fas fa-copy"></i> 复制结果
+                    </button>
+                    <button id="saveBtn" class="btn btn-small btn-primary">
+                        <i class="fas fa-save"></i> 保存到飞书
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <footer class="popup-footer">
+            <p>© 2024 网站信息提取器</p>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

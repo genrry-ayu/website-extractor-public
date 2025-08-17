@@ -3,114 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>社交媒体链接提取器</title>
+    <title>网站信息提取器</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <header>
-            <div class="header-content">
-                <div class="header-main">
-                    <h1><i class="fas fa-link"></i> 社交媒体链接提取器</h1>
-                    <p>输入网站地址，自动提取 Instagram 和 Facebook 链接</p>
-                </div>
-                <div class="config-link">
-                    <a href="config.html" class="config-btn">
-                        <i class="fas fa-cog"></i> 飞书配置
-                    </a>
-                </div>
-            </div>
+        <!-- 头部 -->
+        <header class="header">
+            <h1><i class="fas fa-magic"></i> 网站信息提取器</h1>
+            <a href="/config" class="config-link">
+                <i class="fas fa-cog"></i> 飞书配置
+            </a>
         </header>
 
-        <main>
+        <!-- 主要内容 -->
+        <main class="main">
+            <!-- 输入区域 -->
             <div class="input-section">
                 <div class="input-group">
                     <input type="url" id="urlInput" placeholder="请输入网站地址 (例如: https://example.com)" required>
-                    <button id="extractBtn" onclick="extractLinks()">
-                        <i class="fas fa-search"></i> 提取链接
+                    <button id="extractBtn">
+                        <i class="fas fa-search"></i> 提取信息
                     </button>
                 </div>
             </div>
 
+            <!-- 加载状态 -->
             <div class="loading" id="loading" style="display: none;">
                 <div class="spinner"></div>
-                <p>正在分析网站...</p>
+                <p>正在提取信息...</p>
             </div>
 
+            <!-- 结果展示 -->
             <div class="results" id="results" style="display: none;">
                 <h2>提取结果</h2>
                 
-                <!-- 飞书状态提示 -->
-                <div class="webhook-status" id="webhookStatus" style="display: none;">
-                    <div class="webhook-success" id="webhookSuccess" style="display: none;">
+                <!-- 飞书状态 -->
+                <div class="feishu-status" id="feishuStatus" style="display: none;">
+                    <div class="feishu-success" id="feishuSuccess" style="display: none;">
                         <i class="fas fa-check-circle"></i>
                         <span>数据已成功写入飞书多维表格</span>
                     </div>
-                    <div class="webhook-error" id="webhookError" style="display: none;">
+                    <div class="feishu-error" id="feishuError" style="display: none;">
                         <i class="fas fa-exclamation-triangle"></i>
                         <span>数据写入失败，但提取结果正常</span>
                     </div>
                 </div>
 
-                <!-- 纯文本信息展示 -->
-                <div class="text-results">
-                    <div class="result-section">
-                        <h3><i class="fas fa-globe"></i> 官网</h3>
-                        <div class="result-content" id="websiteUrl">未找到</div>
+                <!-- 信息展示 -->
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>官网地址</label>
+                        <span id="websiteUrl">未找到</span>
                     </div>
-
-                    <div class="result-section">
-                        <h3><i class="fas fa-building"></i> 公司名称</h3>
-                        <div class="result-content" id="companyName">未找到</div>
+                    <div class="info-item">
+                        <label>公司名称</label>
+                        <span id="companyName">未找到</span>
                     </div>
-
-                    <div class="result-section">
-                        <h3><i class="fas fa-info-circle"></i> 公司简介</h3>
-                        <div class="result-content" id="description">未找到</div>
+                    <div class="info-item">
+                        <label>公司简介</label>
+                        <span id="description">未找到</span>
                     </div>
-
-                    <div class="result-section">
-                        <h3><i class="fas fa-map-marker-alt"></i> 地址</h3>
-                        <div class="result-content" id="address">未找到</div>
+                    <div class="info-item">
+                        <label>地址</label>
+                        <span id="address">未找到</span>
                     </div>
-
-                    <div class="result-section">
-                        <h3><i class="fas fa-envelope"></i> 邮箱</h3>
-                        <div class="result-content" id="email">未找到</div>
+                    <div class="info-item">
+                        <label>邮箱</label>
+                        <span id="email">未找到</span>
                     </div>
-
-                    <div class="result-section">
-                        <h3><i class="fas fa-phone"></i> 电话</h3>
-                        <div class="result-content" id="phone">未找到</div>
+                    <div class="info-item">
+                        <label>电话</label>
+                        <span id="phone">未找到</span>
                     </div>
-
-                    <div class="result-section">
-                        <h3><i class="fab fa-instagram"></i> Instagram</h3>
-                        <div class="result-content" id="instagramLinks">未找到</div>
+                    <div class="info-item">
+                        <label>Instagram</label>
+                        <span id="instagramLinks">未找到</span>
                     </div>
-
-                    <div class="result-section">
-                        <h3><i class="fab fa-facebook"></i> Facebook</h3>
-                        <div class="result-content" id="facebookLinks">未找到</div>
+                    <div class="info-item">
+                        <label>Facebook</label>
+                        <span id="facebookLinks">未找到</span>
                     </div>
                 </div>
-
-                <div class="summary" id="summary"></div>
-            </div>
-
-            <div class="error" id="error" style="display: none;">
-                <i class="fas fa-exclamation-triangle"></i>
-                <p id="errorMessage"></p>
             </div>
         </main>
 
-        <footer>
-            <p>© 2024 社交媒体链接提取器 | 安全、快速、准确</p>
+        <!-- 底部 -->
+        <footer class="footer">
+            <p>&copy; 2024 网站信息提取器</p>
         </footer>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

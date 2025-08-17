@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞书配置 - 网站信息提取器</title>
+    <link rel="stylesheet" href="config_sidebar.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="config-container">
+        <header class="config-header">
+            <h1><i class="fas fa-cog"></i> 飞书配置</h1>
+            <p>配置飞书应用信息，用于数据同步</p>
+        </header>
+
+        <main class="config-main">
+            <form id="configForm" class="config-form">
+                <div class="form-group">
+                    <label for="appId">
+                        <i class="fas fa-key"></i> 飞书应用 ID
+                    </label>
+                    <input type="text" id="appId" name="appId" placeholder="请输入飞书应用 ID" required>
+                    <div class="help-text">在飞书开放平台创建应用后获得</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="appSecret">
+                        <i class="fas fa-lock"></i> 飞书应用密钥
+                    </label>
+                    <input type="password" id="appSecret" name="appSecret" placeholder="请输入飞书应用密钥" required>
+                    <div class="help-text">在飞书开放平台应用详情页面获取</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="bitableUrl">
+                        <i class="fas fa-table"></i> 多维表格链接
+                    </label>
+                    <input type="url" id="bitableUrl" name="bitableUrl" placeholder="请输入飞书多维表格链接" required>
+                    <div class="help-text">飞书多维表格的完整链接地址</div>
+                </div>
+
+                <div class="config-buttons">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> 保存配置
+                    </button>
+                    <button type="button" id="testBtn" class="btn btn-secondary">
+                        <i class="fas fa-test"></i> 测试连接
+                    </button>
+                </div>
+            </form>
+
+            <!-- 配置状态 -->
+            <div class="config-status" id="configStatus" style="display: none;">
+                <div class="status-success" id="statusSuccess" style="display: none;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>配置保存成功！</span>
+                </div>
+                <div class="status-error" id="statusError" style="display: none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span id="errorMessage">配置保存失败</span>
+                </div>
+            </div>
+
+            <!-- 使用说明 -->
+            <div class="help-section">
+                <h3><i class="fas fa-question-circle"></i> 配置说明</h3>
+                <div class="help-content">
+                    <h4>1. 创建飞书应用</h4>
+                    <p>访问 <a href="https://open.feishu.cn/" target="_blank">飞书开放平台</a>，创建新应用并获取应用 ID 和密钥。</p>
+                    
+                    <h4>2. 配置应用权限</h4>
+                    <p>在应用详情页面，添加以下权限：</p>
+                    <ul>
+                        <li>多维表格：读写权限</li>
+                        <li>用户信息：读取权限</li>
+                    </ul>
+                    
+                    <h4>3. 获取多维表格信息</h4>
+                    <p>在飞书中创建多维表格，复制表格链接地址。</p>
+                    
+                    <h4>4. 发布应用</h4>
+                    <p>将应用发布到企业或工作台，确保有访问权限。</p>
+                </div>
+            </div>
+        </main>
+
+        <footer class="config-footer">
+            <a href="#" id="backBtn" class="btn btn-small">
+                <i class="fas fa-arrow-left"></i> 返回扩展
+            </a>
+        </footer>
+    </div>
+
+    <script src="config_sidebar.js"></script>
+</body>
+</html>
