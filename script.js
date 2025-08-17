@@ -42,7 +42,7 @@ class WebsiteExtractor {
         this.showLoading();
 
         try {
-            const response = await fetch('/.netlify/functions/extract', {
+            const response = await fetch('/api/extract', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
