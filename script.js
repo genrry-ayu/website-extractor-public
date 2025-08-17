@@ -25,10 +25,12 @@ class WebsiteExtractor {
     // 检测当前环境并返回正确的API端点
     getApiEndpoint() {
         // 检查是否在 Netlify 环境
-        if (window.location.hostname.includes('netlify.app')) {
+        if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('unrivaled-pavlova')) {
+            console.log('检测到 Netlify 环境，使用 Netlify Functions');
             return '/.netlify/functions/extract';
         }
         // 本地环境
+        console.log('检测到本地环境，使用本地 API');
         return '/api/extract';
     }
 
