@@ -95,3 +95,6 @@ logs
 # Temporary files
 tmp/
 temp/
+
+# Netlify Functions - 不要排除这些文件
+!netlify/functions/node_modules/

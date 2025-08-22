@@ -2,8 +2,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 
 exports.handler = async (event, context) => {
-    console.log('=== Function triggered at:', new Date().toISOString() === '===');
-    console.log('Function triggered');
+    console.log('Function triggered at:', new Date().toISOString());
     
     // 启用 CORS
     const headers = {
@@ -85,7 +84,7 @@ exports.handler = async (event, context) => {
             }
         });
 
-        console.log('Extraction completed');
+        console.log('Extraction completed successfully');
 
         return {
             statusCode: 200,
@@ -99,7 +98,7 @@ exports.handler = async (event, context) => {
         };
 
     } catch (error) {
-        console.error('Error:', error.message);
+        console.error('Error in function:', error.message);
         
         return {
             statusCode: 500,
