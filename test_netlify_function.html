@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netlify Function 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Netlify Function 测试页面</h1>
+        
+        <div class="test-section">
+            <h3>1. 环境检测测试</h3>
+            <button onclick="testEnvironment()">检测当前环境</button>
+            <div id="envResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. API端点测试</h3>
+            <button onclick="testApiEndpoint()">测试API端点</button>
+            <div id="apiResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 函数调用测试</h3>
+            <input type="text" id="testUrl" placeholder="输入测试URL (例如: https://example.com)" value="https://example.com">
+            <button onclick="testFunction()">测试函数调用</button>
+            <div id="functionResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. 错误处理测试</h3>
+            <button onclick="testErrorHandling()">测试错误处理</button>
+            <div id="errorResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // 检测当前环境
+        function testEnvironment() {
+            const result = document.getElementById('envResult');
+            const hostname = window.location.hostname;
+            const isNetlify = hostname.includes('netlify.app') || hostname.includes('unrivaled-pavlova');
+            
+            result.innerHTML = `
+环境信息:
+- 主机名: ${hostname}
+- 是否Netlify环境: ${isNetlify ? '是' : '否'}
+- 当前URL: ${window.location.href}
+- API端点: ${isNetlify ? '/.netlify/functions/extract' : '/api/extract'}
+            `;
+            result.className = 'result success';
+        }
+
+        // 测试API端点
+        async function testApiEndpoint() {
+            const result = document.getElementById('apiResult');
+            result.innerHTML = '正在测试...';
+            
+            try {
+                const isNetlify = window.location.hostname.includes('netlify.app') || window.location.hostname.includes('unrivaled-pavlova');
+                const endpoint = isNetlify ? '/.netlify/functions/extract' : '/api/extract';
+                
+                const response = await fetch(endpoint, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                result.innerHTML = `
+API端点测试结果:
+- 端点: ${endpoint}
+- 状态码: ${response.status}
+- 状态文本: ${response.statusText}
+- 响应头: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}
+                `;
+                result.className = response.ok ? 'result success' : 'result error';
+            } catch (error) {
+                result.innerHTML = `API端点测试失败: ${error.message}`;
+                result.className = 'result error';
+            }
+        }
+
+        // 测试函数调用
+        async function testFunction() {
+            const result = document.getElementById('functionResult');
+            const url = document.getElementById('testUrl').value.trim();
+            
+            if (!url) {
+                result.innerHTML = '请输入测试URL';
+                result.className = 'result error';
+                return;
+            }
+            
+            result.innerHTML = '正在调用函数...';
+            
+            try {
+                const isNetlify = window.location.hostname.includes('netlify.app') || window.location.hostname.includes('unrivaled-pavlova');
+                const endpoint = isNetlify ? '/.netlify/functions/extract' : '/api/extract';
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                const data = await response.json();
+                
+                result.innerHTML = `
+函数调用结果:
+- 端点: ${endpoint}
+- 状态码: ${response.status}
+- 请求URL: ${url}
+- 响应数据: ${JSON.stringify(data, null, 2)}
+                `;
+                result.className = response.ok ? 'result success' : 'result error';
+            } catch (error) {
+                result.innerHTML = `函数调用失败: ${error.message}`;
+                result.className = 'result error';
+            }
+        }
+
+        // 测试错误处理
+        async function testErrorHandling() {
+            const result = document.getElementById('errorResult');
+            result.innerHTML = '正在测试错误处理...';
+            
+            try {
+                const isNetlify = window.location.hostname.includes('netlify.app') || window.location.hostname.includes('unrivaled-pavlova');
+                const endpoint = isNetlify ? '/.netlify/functions/extract' : '/api/extract';
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: '' }) // 空URL测试错误处理
+                });
+                
+                const data = await response.json();
+                
+                result.innerHTML = `
+错误处理测试结果:
+- 端点: ${endpoint}
+- 状态码: ${response.status}
+- 错误响应: ${JSON.stringify(data, null, 2)}
+                `;
+                result.className = 'result success'; // 错误处理成功也是成功
+            } catch (error) {
+                result.innerHTML = `错误处理测试失败: ${error.message}`;
+                result.className = 'result error';
+            }
+        }
+
+        // 页面加载时自动检测环境
+        window.onload = function() {
+            testEnvironment();
+        };
+    </script>
+</body>
+</html>
