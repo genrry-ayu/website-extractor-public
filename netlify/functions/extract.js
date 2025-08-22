@@ -2,6 +2,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 
 exports.handler = async (event, context) => {
+    console.log('=== Function triggered at:', new Date().toISOString() === '===');
     console.log('Function triggered');
     
     // 启用 CORS
