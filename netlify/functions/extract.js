@@ -2,7 +2,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 
 exports.handler = async (event, context) => {
-    console.log('Function triggered with event:', JSON.stringify(event, null, 2));
+    console.log('Function triggered');
     
     // 启用 CORS
     const headers = {
@@ -13,7 +13,6 @@ exports.handler = async (event, context) => {
 
     // 处理 OPTIONS 请求
     if (event.httpMethod === 'OPTIONS') {
-        console.log('Handling OPTIONS request');
         return {
             statusCode: 200,
             headers,
@@ -22,11 +21,9 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        console.log('Request body:', event.body);
         const { url } = JSON.parse(event.body || '{}');
         
         if (!url) {
-            console.log('No URL provided');
             return {
                 statusCode: 400,
                 headers,
@@ -87,7 +84,7 @@ exports.handler = async (event, context) => {
             }
         });
 
-        console.log('Extraction completed:', info);
+        console.log('Extraction completed');
 
         return {
             statusCode: 200,
@@ -101,16 +98,14 @@ exports.handler = async (event, context) => {
         };
 
     } catch (error) {
-        console.error('Error in function:', error.message);
-        console.error('Error stack:', error.stack);
+        console.error('Error:', error.message);
         
         return {
             statusCode: 500,
             headers,
             body: JSON.stringify({
                 success: false,
-                error: error.message,
-                details: 'Netlify Function execution failed'
+                error: error.message
             })
         };
     }
