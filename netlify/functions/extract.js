@@ -49,6 +49,9 @@ exports.handler = async (event) => {
     const websiteInfo = await extractWebsiteInfo($, url);
 
     console.log('提取完成:', websiteInfo);
+    console.log('社交媒体链接详情:');
+    console.log('- Instagram:', websiteInfo.instagram);
+    console.log('- Facebook:', websiteInfo.facebook);
 
     // 尝试写入飞书多维表格
     let feishuSuccess = false;
@@ -154,25 +157,87 @@ async function extractWebsiteInfo($, url) {
     }
   }
 
-  // 提取社交媒体链接
+  // 提取社交媒体链接 - 重点关注页头、页脚和浮层
   const instagram = [];
   const facebook = [];
 
-  $('a[href*="instagram.com"]').each((i, el) => {
+  // 1. 优先从页头导航中提取
+  $('header a[href*="instagram.com"], nav a[href*="instagram.com"], .header a[href*="instagram.com"], .nav a[href*="instagram.com"]').each((i, el) => {
     const href = $(el).attr('href');
     if (href && !instagram.includes(href)) {
       instagram.push(href);
     }
   });
 
-  $('a[href*="facebook.com"]').each((i, el) => {
+  $('header a[href*="facebook.com"], nav a[href*="facebook.com"], .header a[href*="facebook.com"], .nav a[href*="facebook.com"]').each((i, el) => {
     const href = $(el).attr('href');
     if (href && !facebook.includes(href)) {
       facebook.push(href);
     }
   });
 
-  // 如果没有找到社交媒体链接，尝试从文本中提取
+  // 2. 从页脚中提取
+  $('footer a[href*="instagram.com"], .footer a[href*="instagram.com"]').each((i, el) => {
+    const href = $(el).attr('href');
+    if (href && !instagram.includes(href)) {
+      instagram.push(href);
+    }
+  });
+
+  $('footer a[href*="facebook.com"], .footer a[href*="facebook.com"]').each((i, el) => {
+    const href = $(el).attr('href');
+    if (href && !facebook.includes(href)) {
+      facebook.push(href);
+    }
+  });
+
+  // 3. 从社交媒体图标和按钮中提取
+  $('a[href*="instagram.com"]').each((i, el) => {
+    const href = $(el).attr('href');
+    const $el = $(el);
+    // 检查是否是社交媒体图标或按钮
+    if (href && !instagram.includes(href) && 
+        ($el.find('svg').length > 0 || 
+         $el.find('i').length > 0 || 
+         $el.hasClass('social') || 
+         $el.hasClass('instagram') ||
+         $el.text().toLowerCase().includes('instagram') ||
+         $el.attr('aria-label')?.toLowerCase().includes('instagram'))) {
+      instagram.push(href);
+    }
+  });
+
+  $('a[href*="facebook.com"]').each((i, el) => {
+    const href = $(el).attr('href');
+    const $el = $(el);
+    // 检查是否是社交媒体图标或按钮
+    if (href && !facebook.includes(href) && 
+        ($el.find('svg').length > 0 || 
+         $el.find('i').length > 0 || 
+         $el.hasClass('social') || 
+         $el.hasClass('facebook') ||
+         $el.text().toLowerCase().includes('facebook') ||
+         $el.attr('aria-label')?.toLowerCase().includes('facebook'))) {
+      facebook.push(href);
+    }
+  });
+
+  // 4. 从浮动元素和模态框中提取
+  $('.modal a[href*="instagram.com"], .popup a[href*="instagram.com"], .floating a[href*="instagram.com"]').each((i, el) => {
+    const href = $(el).attr('href');
+    if (href && !instagram.includes(href)) {
+      instagram.push(href);
+    }
+  });
+
+  $('.modal a[href*="facebook.com"], .popup a[href*="facebook.com"], .floating a[href*="facebook.com"]').each((i, el) => {
+    const href = $(el).attr('href');
+    if (href && !facebook.includes(href)) {
+      facebook.push(href);
+    }
+  });
+
+  // 5. 从文本内容中提取（作为备用方案）
   if (instagram.length === 0) {
     const instagramMatches = $('body').text().match(/instagram\.com\/[A-Za-z0-9._]+/g);
     if (instagramMatches) {
@@ -187,14 +252,22 @@ async function extractWebsiteInfo($, url) {
     }
   }
 
+  // 6. 去重并清理链接
+  const cleanInstagram = [...new Set(instagram)].filter(link => 
+    link && link.includes('instagram.com') && !link.includes('javascript:')
+  );
+  const cleanFacebook = [...new Set(facebook)].filter(link => 
+    link && link.includes('facebook.com') && !link.includes('javascript:')
+  );
+
   return {
     companyName: companyName || '未找到',
     description: description || '未找到',
     address: address || '未找到',
     email: email || '未找到',
     phone: phone || '未找到',
-    instagram: instagram,
-    facebook: facebook
+    instagram: cleanInstagram,
+    facebook: cleanFacebook
   };
 }
 
