@@ -150,50 +150,43 @@ class WebsiteExtractor {
         this.showLoading();
 
         try {
+            // 1) 先确保已登录 & 已配置
+            const user = netlifyIdentity.currentUser();
+            if (user) {
+                // 登录用户：检查个人配置
+                const status = await this.checkConfigStatus();
+                if (!status.ok) {
+                    this.hideLoading();
+                    if (status.reason === 'auth_required') {
+                        this.showError('请先登录再使用此功能。');
+                        return;
+                    }
+                    if (status.reason === 'user_config_missing') {
+                        this.showError('请先在"配置"里保存你的飞书 AppID/Secret/TableId。');
+                        return;
+                    }
+                    this.showError(`无法开始提取：${status.reason}`);
+                    return;
+                }
+                console.log('用户配置检查通过，使用个人配置');
+            } else {
+                // 未登录用户：使用环境变量配置
+                console.log('用户未登录，使用环境变量配置');
+            }
+
+            // 2) 再真正调用 /api/extract
             const apiEndpoint = this.getApiEndpoint();
             console.log('使用API端点:', apiEndpoint);
-            
-            // 获取飞书配置
-            const feishuConfig = this.getFeishuConfig();
-            console.log('飞书配置状态:', feishuConfig ? '已配置' : '未配置');
-            
-            // 根据登录状态选择fetch方式
-            const user = netlifyIdentity.currentUser();
-            let response;
             
             if (user) {
                 // 登录用户：使用带身份验证的fetch
                 console.log('使用身份验证fetch');
-                response = await this.authedFetch(apiEndpoint, {
+                const data = await this.authedFetch(apiEndpoint, {
                     method: 'POST',
-                    body: JSON.stringify({ 
-                        url: url,
-                        feishuConfig: feishuConfig
-                    })
+                    body: JSON.stringify({ url })
                 });
-            } else {
-                // 未登录用户：使用普通fetch
-                console.log('使用普通fetch');
-                response = await fetch(apiEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        url: url,
-                        feishuConfig: feishuConfig
-                    })
-                });
-            }
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data.ok) {
-                // 服务器返回的数据结构是 { ok: true, results: websiteInfo, url: targetUrl.href, feishuSuccess: feishuSuccess }
+                
+                // 处理成功结果
                 const websiteInfo = data.results;
                 websiteInfo.url = data.url; // 添加URL到结果中
                 
@@ -207,20 +200,52 @@ class WebsiteExtractor {
                     this.showFeishuError();
                 }
             } else {
-                throw new Error(data.message || data.error || '提取失败');
+                // 未登录用户：使用普通fetch
+                console.log('使用普通fetch');
+                const response = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.ok) {
+                    const websiteInfo = data.results;
+                    websiteInfo.url = data.url;
+                    
+                    this.displayResults(websiteInfo);
+                    this.hideLoading();
+                    
+                    if (data.feishuSuccess) {
+                        this.showFeishuSuccess();
+                    } else {
+                        this.showFeishuError();
+                    }
+                } else {
+                    throw new Error(data.message || data.error || '提取失败');
+                }
             }
-        } catch (error) {
-            console.error('提取失败:', error);
+        } catch (e) {
+            console.error('提取失败:', e);
             this.hideLoading();
             
-            // 检查是否是配置缺失错误
-            if (error.message.includes('missing_config') || error.message.includes('缺少必要的飞书配置')) {
-                this.showError('需要配置飞书信息才能使用此功能。请先配置飞书应用信息。');
-            } else if (error.message.includes('missing_url')) {
-                this.showError('请输入有效的网站URL。');
-            } else {
-                this.showError('提取失败: ' + error.message);
-            }
+            const msg = e.message === 'user_config_missing'
+                ? '未找到你的个人配置，请先保存后重试。'
+                : e.message === 'auth_required'
+                ? '请先登录。'
+                : e.message === 'missing_config'
+                ? '需要配置飞书信息才能使用此功能。请先配置飞书应用信息。'
+                : e.message === 'missing_url'
+                ? '请输入有效的网站URL。'
+                : `提取失败（${e.message}）`;
+            
+            this.showError(msg);
         }
     }
 
@@ -276,10 +301,24 @@ class WebsiteExtractor {
         document.getElementById('loading').style.display = 'block';
         document.getElementById('results').style.display = 'none';
         document.getElementById('feishuStatus').style.display = 'none';
+        
+        // 禁用提取按钮，防止重复点击
+        const extractBtn = document.querySelector('button[onclick="extractor.extractLinks()"]');
+        if (extractBtn) {
+            extractBtn.disabled = true;
+            extractBtn.textContent = '提取中...';
+        }
     }
 
     hideLoading() {
         document.getElementById('loading').style.display = 'none';
+        
+        // 恢复提取按钮
+        const extractBtn = document.querySelector('button[onclick="extractor.extractLinks()"]');
+        if (extractBtn) {
+            extractBtn.disabled = false;
+            extractBtn.textContent = '开始提取';
+        }
     }
 
     showError(message) {
@@ -340,15 +379,16 @@ class WebsiteExtractor {
         }
     }
 
-    // 带身份验证的fetch
+    // 带身份验证的fetch - 返回更清晰的错误
     async authedFetch(path, options = {}) {
-        const user = netlifyIdentity.currentUser();
-        if (!user) {
-            throw new Error('用户未登录');
+        const u = netlifyIdentity.currentUser();
+        if (!u) {
+            netlifyIdentity.open('login');
+            throw new Error('auth_required');
         }
         
-        const token = await user.jwt();
-        return fetch(path, {
+        const token = await u.jwt();
+        const resp = await fetch(path, {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
@@ -356,37 +396,38 @@ class WebsiteExtractor {
                 ...(options.headers || {})
             }
         });
+
+        let data = null;
+        try { 
+            data = await resp.json(); 
+        } catch (_) { 
+            /* 不是 JSON 就保持 null */ 
+        }
+
+        if (!resp.ok) {
+            const code = data && data.error ? data.error : `http_${resp.status}`;
+            // 把服务端错误代码透出：auth_required / user_config_missing / missing_fields / internal_error ...
+            const err = new Error(code);
+            err.status = resp.status;
+            err.payload = data;
+            throw err;
+        }
+        return data;
     }
 
-    // 检查配置状态
+    // 检查配置状态 - 返回详细状态信息
     async checkConfigStatus() {
         try {
-            const user = netlifyIdentity.currentUser();
-            if (!user) {
-                console.log('用户未登录，跳过配置检查');
-                return;
+            const data = await this.authedFetch('/.netlify/functions/config-get'); // 需要登录
+            return { ok: true, config: data.config }; // appSecret 是打码的
+        } catch (e) {
+            if (e.message === 'auth_required' || e.status === 401) {
+                return { ok: false, reason: 'auth_required' };
             }
-
-            const response = await this.authedFetch('/.netlify/functions/config-get');
-            if (!response.ok) {
-                if (response.status === 401) {
-                    console.log('用户未登录，需要重新登录');
-                    return;
-                }
-                if (response.status === 404) {
-                    console.log('用户已登录但未保存配置');
-                    return;
-                }
-                console.log('配置检查失败:', response.status);
-                return;
+            if (e.status === 404 || e.message === 'not_found') {
+                return { ok: false, reason: 'user_config_missing' };
             }
-            
-            const data = await response.json();
-            if (data.ok && data.config) {
-                console.log('用户配置已存在');
-            }
-        } catch (error) {
-            console.log('配置检查失败:', error.message);
+            return { ok: false, reason: e.message || 'unknown' };
         }
     }
 }
