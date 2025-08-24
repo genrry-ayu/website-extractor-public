@@ -135,6 +135,12 @@
             color: #721c24;
         }
         
+        .status-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
         .back-link {
             display: inline-flex;
             align-items: center;
@@ -212,11 +218,17 @@
             </div>
             
             <div class="config-buttons">
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-save"></i> 保存配置
+                <button type="button" class="btn btn-secondary" onclick="testConnection()">
+                    <i class="fas fa-wifi"></i> 测试连接
                 </button>
                 <button type="button" class="btn btn-secondary" onclick="loadConfig()">
                     <i class="fas fa-download"></i> 加载配置
+                </button>
+            </div>
+            
+            <div class="config-buttons" style="margin-top: 15px;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> 保存配置
                 </button>
             </div>
         </form>

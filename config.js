@@ -235,6 +235,66 @@ class ConfigManager {
     hasConfig() {
         return localStorage.getItem(this.storageKey) !== null;
     }
+    
+    // 测试飞书连接
+    async testConnection() {
+        try {
+            const formData = {
+                appId: document.getElementById('appId').value.trim(),
+                appSecret: document.getElementById('appSecret').value.trim(),
+                bitableUrl: document.getElementById('bitableUrl').value.trim()
+            };
+            
+            // 验证数据
+            if (!formData.appId || !formData.appSecret || !formData.bitableUrl) {
+                this.showStatus('请先填写完整的配置信息', 'error');
+                return;
+            }
+            
+            // 验证多维表格链接格式
+            if (!this.isValidBitableUrl(formData.bitableUrl)) {
+                this.showStatus('请输入有效的飞书多维表格链接', 'error');
+                return;
+            }
+            
+            this.showStatus('正在测试飞书连接...', 'info');
+            
+            // 转换字段名称以匹配API期望的格式
+            const apiData = {
+                feishuAppId: formData.appId,
+                feishuAppSecret: formData.appSecret,
+                feishuTableId: this.extractTableIdFromUrl(formData.bitableUrl)
+            };
+            
+            console.log('测试连接配置:', {
+                appId: apiData.feishuAppId,
+                appSecret: apiData.feishuAppSecret.substring(0, 10) + '...',
+                tableId: apiData.feishuTableId
+            });
+            
+            const response = await fetch('/api/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(apiData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showStatus('✅ 连接测试成功！飞书API配置正确', 'success');
+                console.log('连接测试成功:', result.message);
+            } else {
+                this.showStatus('❌ 连接测试失败: ' + result.error, 'error');
+                console.error('连接测试失败:', result.error);
+            }
+            
+        } catch (error) {
+            console.error('测试连接失败:', error);
+            this.showStatus('❌ 连接测试失败: ' + error.message, 'error');
+        }
+    }
 }
 
 // 全局函数，供HTML调用
@@ -247,6 +307,12 @@ function loadConfig() {
 function clearConfig() {
     if (window.configManager) {
         window.configManager.clearConfig();
+    }
+}
+
+function testConnection() {
+    if (window.configManager) {
+        window.configManager.testConnection();
     }
 }
 
