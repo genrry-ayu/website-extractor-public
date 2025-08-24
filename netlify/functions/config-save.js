@@ -1,9 +1,10 @@
+// netlify/functions/config-save.js
 const crypto = require('crypto');
 const { getStore } = require('@netlify/blobs');
 
 const ENC_KEY = crypto.createHash('sha256')
   .update(process.env.CONFIG_ENC_KEY || 'dev-insecure-key-change-me')
-  .digest(); // 32 bytes
+  .digest();
 
 function encrypt(obj) {
   const iv = crypto.randomBytes(12);
@@ -11,62 +12,32 @@ function encrypt(obj) {
   const data = Buffer.from(JSON.stringify(obj));
   const enc = Buffer.concat([cipher.update(data), cipher.final()]);
   const tag = cipher.getAuthTag();
-  // 格式: iv(12) + tag(16) + enc
   return Buffer.concat([iv, tag, enc]).toString('base64');
 }
 
 exports.handler = async (event, context) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-  };
-
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+    return { statusCode: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,content-type' } };
   }
 
   const user = context.clientContext?.user;
-  if (!user) {
-    return { 
-      statusCode: 401, 
-      headers,
-      body: JSON.stringify({ ok: false, error: 'unauthorized' }) 
-    };
-  }
+  if (!user) return { statusCode: 401, body: JSON.stringify({ ok:false, error:'auth_required' }) };
 
   try {
     const body = JSON.parse(event.body || '{}');
-    // 兼容两套字段名：新版本 appId/appSecret/tableId，旧版本 feishuAppId/feishuAppSecret/feishuTableId
     const appId     = body.appId     || body.feishuAppId;
     const appSecret = body.appSecret || body.feishuAppSecret;
     const tableId   = body.tableId   || body.feishuTableId;
-    
     if (!appId || !appSecret || !tableId) {
-      return { 
-        statusCode: 400, 
-        headers,
-        body: JSON.stringify({ ok: false, error: 'missing_fields' }) 
-      };
+      return { statusCode: 400, body: JSON.stringify({ ok:false, error:'missing_fields' }) };
     }
 
-    const store = getStore({ name: 'feishu-configs' }); // site 级命名空间
-    const cipherText = encrypt({ appId, appSecret, tableId });
-    await store.set(user.sub, cipherText); // 以用户唯一ID为 key
+    const store = getStore({ name: 'feishu-configs' });
+    await store.set(user.sub, encrypt({ appId, appSecret, tableId }));
 
-    console.log(`用户 ${user.sub} 配置已保存`);
-
-    return { 
-      statusCode: 200, 
-      headers,
-      body: JSON.stringify({ ok: true, message: '配置保存成功' }) 
-    };
-  } catch (error) {
-    console.error('保存配置失败:', error);
-    return { 
-      statusCode: 500, 
-      headers,
-      body: JSON.stringify({ ok: false, error: 'server_error' }) 
-    };
+    return { statusCode: 200, body: JSON.stringify({ ok:true }) };
+  } catch (e) {
+    console.error('config-save error:', String(e));
+    return { statusCode: 500, body: JSON.stringify({ ok:false, error:'internal_error' }) };
   }
 };

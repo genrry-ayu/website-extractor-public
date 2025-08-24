@@ -1,4 +1,4 @@
-// netlify/functions/config-get.js (CJS)
+// netlify/functions/config-get.js
 const crypto = require('crypto');
 const { getStore } = require('@netlify/blobs');
 
@@ -16,10 +16,10 @@ function decrypt(b64) {
   const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
   return JSON.parse(dec.toString());
 }
-const mask = (s)=> s ? s.slice(0,3)+'***'+s.slice(-2) : '';
+const mask = s => (s ? s.slice(0,3)+'***'+s.slice(-2) : '');
 
 exports.handler = async (event, context) => {
-  // 预检（跨源时）
+  // 预检（如跨源）
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,content-type' } };
   }
@@ -40,8 +40,8 @@ exports.handler = async (event, context) => {
     try {
       cfg = decrypt(ctext);
     } catch (e) {
-      console.error('config-get decrypt failed', String(e));
-      // 关键：不要 500，明确告诉前端是密钥不匹配/数据损坏
+      console.error('config-get decrypt failed:', String(e));
+      // 密钥不匹配 / 数据损坏
       return { statusCode: 409, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'enc_key_mismatch' }) };
     }
 
@@ -51,7 +51,7 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ ok:true, config: { appId: cfg.appId, appSecret: mask(cfg.appSecret), tableId: cfg.tableId } })
     };
   } catch (e) {
-    console.error('config-get error', String(e));
+    console.error('config-get internal error:', String(e));
     return { statusCode: 500, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'internal_error' }) };
   }
 };

@@ -388,11 +388,10 @@ class WebsiteExtractor {
     // 带身份验证的fetch - 返回更清晰的错误
     async authedFetch(path, options = {}) {
         const u = netlifyIdentity.currentUser();
-        if (!u) {
-            netlifyIdentity.open('login');
-            throw new Error('auth_required');
+        if (!u) { 
+            netlifyIdentity.open('login'); 
+            throw new Error('auth_required'); 
         }
-        
         const token = await u.jwt();
         const resp = await fetch(path, {
             ...options,
@@ -402,20 +401,13 @@ class WebsiteExtractor {
                 ...(options.headers || {})
             }
         });
-
-        let data = null;
+        let data = null; 
         try { 
             data = await resp.json(); 
-        } catch (_) { 
-            /* 不是 JSON 就保持 null */ 
-        }
-
+        } catch {} 
         if (!resp.ok) {
-            const code = data && data.error ? data.error : `http_${resp.status}`;
-            // 把服务端错误代码透出：auth_required / user_config_missing / missing_fields / internal_error ...
-            const err = new Error(code);
-            err.status = resp.status;
-            err.payload = data;
+            const err = new Error(data?.error || `http_${resp.status}`);
+            err.status = resp.status; 
             throw err;
         }
         return data;
