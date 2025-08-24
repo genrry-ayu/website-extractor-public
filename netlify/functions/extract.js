@@ -161,11 +161,14 @@ async function extractWebsiteInfo($, url) {
   const instagram = [];
   const facebook = [];
 
+  console.log('开始提取社交媒体链接...');
+
   // 1. 优先从页头导航中提取
   $('header a[href*="instagram.com"], nav a[href*="instagram.com"], .header a[href*="instagram.com"], .nav a[href*="instagram.com"]').each((i, el) => {
     const href = $(el).attr('href');
     if (href && !instagram.includes(href)) {
       instagram.push(href);
+      console.log('从页头导航找到Instagram:', href);
     }
   });
 
@@ -173,6 +176,7 @@ async function extractWebsiteInfo($, url) {
     const href = $(el).attr('href');
     if (href && !facebook.includes(href)) {
       facebook.push(href);
+      console.log('从页头导航找到Facebook:', href);
     }
   });
 
@@ -181,6 +185,7 @@ async function extractWebsiteInfo($, url) {
     const href = $(el).attr('href');
     if (href && !instagram.includes(href)) {
       instagram.push(href);
+      console.log('从页脚找到Instagram:', href);
     }
   });
 
@@ -188,10 +193,33 @@ async function extractWebsiteInfo($, url) {
     const href = $(el).attr('href');
     if (href && !facebook.includes(href)) {
       facebook.push(href);
+      console.log('从页脚找到Facebook:', href);
     }
   });
 
-  // 3. 从社交媒体图标和按钮中提取
+  // 3. 从所有包含社交媒体文本的链接中提取
+  $('a').each((i, el) => {
+    const $el = $(el);
+    const href = $el.attr('href');
+    const text = $el.text().toLowerCase();
+    const ariaLabel = $el.attr('aria-label')?.toLowerCase() || '';
+    
+    if (href && (text.includes('instagram') || ariaLabel.includes('instagram'))) {
+      if (!instagram.includes(href)) {
+        instagram.push(href);
+        console.log('从文本匹配找到Instagram:', href, '文本:', text);
+      }
+    }
+    
+    if (href && (text.includes('facebook') || ariaLabel.includes('facebook'))) {
+      if (!facebook.includes(href)) {
+        facebook.push(href);
+        console.log('从文本匹配找到Facebook:', href, '文本:', text);
+      }
+    }
+  });
+
+  // 4. 从社交媒体图标和按钮中提取
   $('a[href*="instagram.com"]').each((i, el) => {
     const href = $(el).attr('href');
     const $el = $(el);
@@ -204,6 +232,7 @@ async function extractWebsiteInfo($, url) {
          $el.text().toLowerCase().includes('instagram') ||
          $el.attr('aria-label')?.toLowerCase().includes('instagram'))) {
       instagram.push(href);
+      console.log('从图标按钮找到Instagram:', href);
     }
   });
 
@@ -219,14 +248,16 @@ async function extractWebsiteInfo($, url) {
          $el.text().toLowerCase().includes('facebook') ||
          $el.attr('aria-label')?.toLowerCase().includes('facebook'))) {
       facebook.push(href);
+      console.log('从图标按钮找到Facebook:', href);
     }
   });
 
-  // 4. 从浮动元素和模态框中提取
+  // 5. 从浮动元素和模态框中提取
   $('.modal a[href*="instagram.com"], .popup a[href*="instagram.com"], .floating a[href*="instagram.com"]').each((i, el) => {
     const href = $(el).attr('href');
     if (href && !instagram.includes(href)) {
       instagram.push(href);
+      console.log('从浮动元素找到Instagram:', href);
     }
   });
 
@@ -234,14 +265,16 @@ async function extractWebsiteInfo($, url) {
     const href = $(el).attr('href');
     if (href && !facebook.includes(href)) {
       facebook.push(href);
+      console.log('从浮动元素找到Facebook:', href);
     }
   });
 
-  // 5. 从文本内容中提取（作为备用方案）
+  // 6. 从文本内容中提取（作为备用方案）
   if (instagram.length === 0) {
     const instagramMatches = $('body').text().match(/instagram\.com\/[A-Za-z0-9._]+/g);
     if (instagramMatches) {
       instagram.push(...instagramMatches.map(match => 'https://' + match));
+      console.log('从文本内容找到Instagram:', instagramMatches);
     }
   }
 
@@ -249,16 +282,23 @@ async function extractWebsiteInfo($, url) {
     const facebookMatches = $('body').text().match(/facebook\.com\/[A-Za-z0-9._]+/g);
     if (facebookMatches) {
       facebook.push(...facebookMatches.map(match => 'https://' + match));
+      console.log('从文本内容找到Facebook:', facebookMatches);
     }
   }
 
-  // 6. 去重并清理链接
+  // 7. 去重并清理链接
   const cleanInstagram = [...new Set(instagram)].filter(link => 
     link && link.includes('instagram.com') && !link.includes('javascript:')
   );
   const cleanFacebook = [...new Set(facebook)].filter(link => 
     link && link.includes('facebook.com') && !link.includes('javascript:')
   );
+
+  console.log('社交媒体提取结果:');
+  console.log('- Instagram原始:', instagram);
+  console.log('- Facebook原始:', facebook);
+  console.log('- Instagram清理后:', cleanInstagram);
+  console.log('- Facebook清理后:', cleanFacebook);
 
   return {
     companyName: companyName || '未找到',
