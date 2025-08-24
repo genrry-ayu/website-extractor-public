@@ -342,8 +342,10 @@ async function writeToFeishu(data) {
     const accessToken = tokenResponse.data.tenant_access_token;
     console.log('成功获取飞书访问令牌');
 
-    // 首先获取多维表格的详细信息
+    // 首先获取多维表格的详细信息，并尝试获取表格列表
+    let tableId = FEISHU_TABLE_ID;
     try {
+      // 尝试获取应用信息
       const appResponse = await axios.get(
         `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}`,
         {
@@ -353,9 +355,29 @@ async function writeToFeishu(data) {
           }
         }
       );
-      console.log('多维表格信息:', appResponse.data);
+      console.log('应用信息:', appResponse.data);
+      
+      // 尝试获取表格列表
+      const tablesResponse = await axios.get(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      console.log('表格列表:', tablesResponse.data);
+      
+      // 如果有表格列表，使用第一个表格的ID
+      if (tablesResponse.data.data && tablesResponse.data.data.items && tablesResponse.data.data.items.length > 0) {
+        tableId = tablesResponse.data.data.items[0].table_id;
+        console.log('使用第一个表格ID:', tableId);
+      }
+      
     } catch (appError) {
-      console.error('获取多维表格信息失败:', appError.response?.data || appError.message);
+      console.error('获取应用/表格信息失败:', appError.response?.data || appError.message);
+      console.log('继续使用原始表格ID:', tableId);
     }
 
     // 写入多维表格
@@ -374,13 +396,13 @@ async function writeToFeishu(data) {
     };
 
     console.log('准备写入数据:', recordData);
+    console.log('目标表格ID:', tableId);
 
-    // 尝试不同的API格式
+    // 尝试写入记录
     let writeResponse;
     try {
-      // 格式1: 使用表格ID
       writeResponse = await axios.post(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables/${FEISHU_TABLE_ID}/records`,
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables/${tableId}/records`,
         recordData,
         {
           headers: {
@@ -389,30 +411,14 @@ async function writeToFeishu(data) {
           }
         }
       );
-      console.log('格式1成功');
-    } catch (error1) {
-      console.log('格式1失败:', error1.response?.data || error1.message);
-      
-      try {
-        // 格式2: 使用应用ID和表格ID
-        writeResponse = await axios.post(
-          `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables/tblFjiGso24abRHl/records`,
-          recordData,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        console.log('格式2成功');
-      } catch (error2) {
-        console.log('格式2失败:', error2.response?.data || error2.message);
-        throw error2;
-      }
+      console.log('写入成功:', writeResponse.status, writeResponse.data);
+    } catch (writeError) {
+      console.error('写入失败:', writeError.response?.data || writeError.message);
+      console.error('错误状态码:', writeError.response?.status);
+      console.error('错误详情:', writeError.response?.data);
+      throw writeError;
     }
 
-    console.log('飞书API响应:', writeResponse.status, writeResponse.data);
     return writeResponse.status === 200;
   } catch (error) {
     console.error('飞书API错误:', error.response?.data || error.message);
