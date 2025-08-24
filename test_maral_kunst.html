@@ -210,6 +210,7 @@
             document.getElementById('address').textContent = data.address || '未找到';
             document.getElementById('email').textContent = data.email || '未找到';
             document.getElementById('phone').textContent = data.phone || '未找到';
+            // 社交媒体链接以纯文本形式显示
             document.getElementById('instagram').textContent = data.instagram?.length > 0 ? data.instagram.join(', ') : '未找到';
             document.getElementById('facebook').textContent = data.facebook?.length > 0 ? data.facebook.join(', ') : '未找到';
             

@@ -106,14 +106,14 @@ class WebsiteExtractor {
         document.getElementById('email').textContent = data.email || '未找到';
         document.getElementById('phone').textContent = data.phone || '未找到';
         
-        // 处理社交媒体链接
+        // 处理社交媒体链接 - 以纯文本形式显示
         const instagramLinks = data.instagram || [];
         const facebookLinks = data.facebook || [];
         
         document.getElementById('instagramLinks').textContent = 
-            instagramLinks.length > 0 ? `${instagramLinks.length} 个链接` : '未找到';
+            instagramLinks.length > 0 ? instagramLinks.join(', ') : '未找到';
         document.getElementById('facebookLinks').textContent = 
-            facebookLinks.length > 0 ? `${facebookLinks.length} 个链接` : '未找到';
+            facebookLinks.length > 0 ? facebookLinks.join(', ') : '未找到';
 
         // 显示结果区域
         resultsContainer.style.display = 'block';
