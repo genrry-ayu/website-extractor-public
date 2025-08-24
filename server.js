@@ -1206,59 +1206,67 @@ app.post('/api/extract', async (req, res) => {
 // 更新飞书配置端点
 app.post('/api/config', async (req, res) => {
     try {
-        const { appId, appSecret, bitableUrl } = req.body;
+        // 支持两种参数格式：前端格式和旧格式
+        const { 
+            feishuAppId, feishuAppSecret, feishuTableId,  // 前端格式
+            appId, appSecret, bitableUrl                   // 旧格式
+        } = req.body;
         
-        if (!appId || !appSecret || !bitableUrl) {
+        // 使用前端格式的参数，如果没有则使用旧格式
+        const appIdToUse = feishuAppId || appId;
+        const appSecretToUse = feishuAppSecret || appSecret;
+        const tableIdToUse = feishuTableId;
+        
+        if (!appIdToUse || !appSecretToUse) {
             return res.status(400).json({
                 success: false,
                 error: '缺少必要的配置参数'
             });
         }
         
-        // 从多维表格链接中提取节点token
+        // 使用前端提供的表格ID，如果没有则尝试从URL中提取
+        let tableId = tableIdToUse || 'tblFjiGso24abRHl'; // 默认值
         let nodeToken = 'F1lbw4vsWie5BHktQVVcj89fn11'; // 默认值
-        let tableId = 'tblFjiGso24abRHl'; // 默认值
         
-        try {
-            const url = new URL(bitableUrl);
-            console.log('解析多维表格URL:', url.href);
-            
-            // 从URL路径中提取节点token
-            if (url.pathname.includes('/wiki/')) {
-                const pathParts = url.pathname.split('/');
-                const wikiIndex = pathParts.indexOf('wiki');
-                if (wikiIndex !== -1 && pathParts[wikiIndex + 1]) {
-                    nodeToken = pathParts[wikiIndex + 1];
-                    console.log('从URL提取的节点token:', nodeToken);
+        console.log('前端提供的表格ID:', tableIdToUse);
+        
+        // 如果前端没有提供表格ID，尝试从bitableUrl中提取
+        if (!tableIdToUse && bitableUrl) {
+            try {
+                const url = new URL(bitableUrl);
+                console.log('解析多维表格URL:', url.href);
+                
+                // 从URL路径中提取节点token
+                if (url.pathname.includes('/wiki/')) {
+                    const pathParts = url.pathname.split('/');
+                    const wikiIndex = pathParts.indexOf('wiki');
+                    if (wikiIndex !== -1 && pathParts[wikiIndex + 1]) {
+                        nodeToken = pathParts[wikiIndex + 1];
+                        console.log('从URL提取的节点token:', nodeToken);
+                    }
                 }
+                
+                // 从查询参数中提取table id
+                const tableParam = url.searchParams.get('table');
+                if (tableParam) {
+                    tableId = tableParam;
+                    console.log('从URL提取的table id:', tableId);
+                }
+            } catch (error) {
+                console.log('URL解析失败，使用默认配置:', error.message);
             }
-            
-            // 从查询参数中提取table id
-            const tableParam = url.searchParams.get('table');
-            if (tableParam) {
-                tableId = tableParam;
-                console.log('从URL提取的table id:', tableId);
-            }
-            
-            console.log('最终使用的配置:', { nodeToken, tableId });
-        } catch (error) {
-            console.log('URL解析失败，使用默认配置:', error.message);
         }
+        
+        console.log('最终使用的配置:', { nodeToken, tableId });
         
         // 获取真正的多维表格App Token
         try {
             console.log('正在获取真正的多维表格App Token...');
             
-            // 临时设置配置以获取访问令牌
-            const tempConfig = {
-                APP_ID: appId,
-                APP_SECRET: appSecret
-            };
-            
             // 获取访问令牌
             const response = await axios.post(`${FEISHU_API_BASE}/auth/v3/tenant_access_token/internal`, {
-                app_id: tempConfig.APP_ID,
-                app_secret: tempConfig.APP_SECRET
+                app_id: appIdToUse,
+                app_secret: appSecretToUse
             }, {
                 headers: {
                     'Content-Type': 'application/json'
@@ -1291,8 +1299,8 @@ app.post('/api/config', async (req, res) => {
                         
                         // 更新配置
                         FEISHU_CONFIG = {
-                            APP_ID: appId,
-                            APP_SECRET: appSecret,
+                            APP_ID: appIdToUse,
+                            APP_SECRET: appSecretToUse,
                             BITABLE_APP_TOKEN: realAppToken,
                             TABLE_ID: tableId,
                             VIEW_ID: 'vewla1O8gN'
@@ -1319,8 +1327,8 @@ app.post('/api/config', async (req, res) => {
             
             // 如果获取失败，使用默认配置
             FEISHU_CONFIG = {
-                APP_ID: appId,
-                APP_SECRET: appSecret,
+                APP_ID: appIdToUse,
+                APP_SECRET: appSecretToUse,
                 BITABLE_APP_TOKEN: nodeToken,
                 TABLE_ID: tableId,
                 VIEW_ID: 'vewla1O8gN'

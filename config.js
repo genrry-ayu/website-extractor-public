@@ -161,36 +161,50 @@ class ConfigManager {
         }
     }
     
-    // 从多维表格URL中提取表格ID
+    // 从多维表格URL中提取表格ID（根据飞书官方文档）
     extractTableIdFromUrl(url) {
         try {
             const urlObj = new URL(url);
+            console.log('解析URL:', url);
+            console.log('URL路径:', urlObj.pathname);
             
-            // 首先尝试从URL参数中提取table ID
+            // 方式一：从URL路径中直接提取table_id
+            // 格式：https://example.feishu.cn/base/abc1234567890/tblsRc9GRRXKqhvW
+            const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
+            console.log('路径部分:', pathParts);
+            
+            // 查找以 'tbl' 开头的部分（表格ID）
+            for (let i = 0; i < pathParts.length; i++) {
+                const part = pathParts[i];
+                if (part.startsWith('tbl') && part.length > 10) {
+                    console.log('从路径中找到表格ID:', part);
+                    return part;
+                }
+            }
+            
+            // 方式二：从URL参数中提取table ID
             const tableParam = urlObj.searchParams.get('table');
-            if (tableParam) {
+            if (tableParam && tableParam.startsWith('tbl')) {
                 console.log('从URL参数提取到表格ID:', tableParam);
                 return tableParam;
             }
             
-            // 从路径中提取
-            const pathParts = urlObj.pathname.split('/');
-            
-            // 查找包含base或wiki的路径部分
-            for (let i = 0; i < pathParts.length; i++) {
-                if (pathParts[i] === 'base' || pathParts[i] === 'wiki') {
-                    // 下一个部分通常是表格ID
-                    if (pathParts[i + 1]) {
-                        console.log('从路径提取到表格ID:', pathParts[i + 1]);
-                        return pathParts[i + 1];
-                    }
-                }
+            // 方式三：从URL参数中提取view参数（可能包含表格信息）
+            const viewParam = urlObj.searchParams.get('view');
+            if (viewParam && viewParam.startsWith('tbl')) {
+                console.log('从view参数提取到表格ID:', viewParam);
+                return viewParam;
             }
             
-            // 如果都没找到，返回URL的最后一个部分
+            // 如果都没找到，尝试从路径的最后部分提取
             const lastPart = pathParts[pathParts.length - 1];
-            console.log('使用URL最后部分作为表格ID:', lastPart);
-            return lastPart || url;
+            if (lastPart && lastPart.length > 10) {
+                console.log('使用URL最后部分作为表格ID:', lastPart);
+                return lastPart;
+            }
+            
+            console.warn('无法从URL中提取表格ID，返回原始URL');
+            return url;
         } catch (error) {
             console.error('提取表格ID失败:', error);
             return url; // 如果提取失败，返回原始URL
