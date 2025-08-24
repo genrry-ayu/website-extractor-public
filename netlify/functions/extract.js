@@ -342,6 +342,22 @@ async function writeToFeishu(data) {
     const accessToken = tokenResponse.data.tenant_access_token;
     console.log('成功获取飞书访问令牌');
 
+    // 首先获取多维表格的详细信息
+    try {
+      const appResponse = await axios.get(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      console.log('多维表格信息:', appResponse.data);
+    } catch (appError) {
+      console.error('获取多维表格信息失败:', appError.response?.data || appError.message);
+    }
+
     // 写入多维表格
     const recordData = {
       fields: {
@@ -359,16 +375,42 @@ async function writeToFeishu(data) {
 
     console.log('准备写入数据:', recordData);
 
-    const writeResponse = await axios.post(
-      `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables/${FEISHU_TABLE_ID}/records`,
-      recordData,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+    // 尝试不同的API格式
+    let writeResponse;
+    try {
+      // 格式1: 使用表格ID
+      writeResponse = await axios.post(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables/${FEISHU_TABLE_ID}/records`,
+        recordData,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
         }
+      );
+      console.log('格式1成功');
+    } catch (error1) {
+      console.log('格式1失败:', error1.response?.data || error1.message);
+      
+      try {
+        // 格式2: 使用应用ID和表格ID
+        writeResponse = await axios.post(
+          `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables/tblFjiGso24abRHl/records`,
+          recordData,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        console.log('格式2成功');
+      } catch (error2) {
+        console.log('格式2失败:', error2.response?.data || error2.message);
+        throw error2;
       }
-    );
+    }
 
     console.log('飞书API响应:', writeResponse.status, writeResponse.data);
     return writeResponse.status === 200;
