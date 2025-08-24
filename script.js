@@ -192,8 +192,8 @@ class WebsiteExtractor {
 
             const data = await response.json();
 
-            if (data.success) {
-                // 服务器返回的数据结构是 { success: true, results: websiteInfo, url: targetUrl.href, feishuSuccess: feishuSuccess }
+            if (data.ok) {
+                // 服务器返回的数据结构是 { ok: true, results: websiteInfo, url: targetUrl.href, feishuSuccess: feishuSuccess }
                 const websiteInfo = data.results;
                 websiteInfo.url = data.url; // 添加URL到结果中
                 
@@ -207,7 +207,7 @@ class WebsiteExtractor {
                     this.showFeishuError();
                 }
             } else {
-                throw new Error(data.error || '提取失败');
+                throw new Error(data.message || data.error || '提取失败');
             }
         } catch (error) {
             console.error('提取失败:', error);
@@ -216,6 +216,8 @@ class WebsiteExtractor {
             // 检查是否是配置缺失错误
             if (error.message.includes('missing_config') || error.message.includes('缺少必要的飞书配置')) {
                 this.showError('需要配置飞书信息才能使用此功能。请先配置飞书应用信息。');
+            } else if (error.message.includes('missing_url')) {
+                this.showError('请输入有效的网站URL。');
             } else {
                 this.showError('提取失败: ' + error.message);
             }
