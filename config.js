@@ -165,6 +165,15 @@ class ConfigManager {
     extractTableIdFromUrl(url) {
         try {
             const urlObj = new URL(url);
+            
+            // 首先尝试从URL参数中提取table ID
+            const tableParam = urlObj.searchParams.get('table');
+            if (tableParam) {
+                console.log('从URL参数提取到表格ID:', tableParam);
+                return tableParam;
+            }
+            
+            // 从路径中提取
             const pathParts = urlObj.pathname.split('/');
             
             // 查找包含base或wiki的路径部分
@@ -172,13 +181,16 @@ class ConfigManager {
                 if (pathParts[i] === 'base' || pathParts[i] === 'wiki') {
                     // 下一个部分通常是表格ID
                     if (pathParts[i + 1]) {
+                        console.log('从路径提取到表格ID:', pathParts[i + 1]);
                         return pathParts[i + 1];
                     }
                 }
             }
             
-            // 如果没找到，返回URL的最后一个部分
-            return pathParts[pathParts.length - 1] || url;
+            // 如果都没找到，返回URL的最后一个部分
+            const lastPart = pathParts[pathParts.length - 1];
+            console.log('使用URL最后部分作为表格ID:', lastPart);
+            return lastPart || url;
         } catch (error) {
             console.error('提取表格ID失败:', error);
             return url; // 如果提取失败，返回原始URL
@@ -260,16 +272,18 @@ class ConfigManager {
             this.showStatus('正在测试飞书连接...', 'info');
             
             // 转换字段名称以匹配API期望的格式
+            const extractedTableId = this.extractTableIdFromUrl(formData.bitableUrl);
             const apiData = {
                 feishuAppId: formData.appId,
                 feishuAppSecret: formData.appSecret,
-                feishuTableId: this.extractTableIdFromUrl(formData.bitableUrl)
+                feishuTableId: extractedTableId
             };
             
             console.log('测试连接配置:', {
                 appId: apiData.feishuAppId,
                 appSecret: apiData.feishuAppSecret.substring(0, 10) + '...',
-                tableId: apiData.feishuTableId
+                tableId: apiData.feishuTableId,
+                originalUrl: formData.bitableUrl
             });
             
             const response = await fetch('/api/config', {

@@ -342,42 +342,13 @@ async function writeToFeishu(data) {
     const accessToken = tokenResponse.data.tenant_access_token;
     console.log('成功获取飞书访问令牌');
 
-    // 首先获取多维表格的详细信息，并尝试获取表格列表
-    let tableId = FEISHU_TABLE_ID;
-    try {
-      // 尝试获取应用信息
-      const appResponse = await axios.get(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      console.log('应用信息:', appResponse.data);
-      
-      // 尝试获取表格列表
-      const tablesResponse = await axios.get(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      console.log('表格列表:', tablesResponse.data);
-      
-      // 如果有表格列表，使用第一个表格的ID
-      if (tablesResponse.data.data && tablesResponse.data.data.items && tablesResponse.data.data.items.length > 0) {
-        tableId = tablesResponse.data.data.items[0].table_id;
-        console.log('使用第一个表格ID:', tableId);
-      }
-      
-    } catch (appError) {
-      console.error('获取应用/表格信息失败:', appError.response?.data || appError.message);
-      console.log('继续使用原始表格ID:', tableId);
+    // 使用从URL中提取的表格ID
+    const tableId = FEISHU_TABLE_ID;
+    console.log('使用从URL提取的表格ID:', tableId);
+    
+    // 验证表格ID格式
+    if (!tableId || tableId.length < 10) {
+      throw new Error('表格ID格式不正确，请检查多维表格链接');
     }
 
     // 写入多维表格
