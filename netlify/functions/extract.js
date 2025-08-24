@@ -346,9 +346,10 @@ async function writeToFeishu(data) {
     const tableId = FEISHU_TABLE_ID;
     console.log('使用从URL提取的表格ID:', tableId);
     
-    // 验证表格ID格式
-    if (!tableId || tableId.length < 10) {
-      throw new Error('表格ID格式不正确，请检查多维表格链接');
+    // 验证表格ID格式（飞书表格ID通常以tbl开头，长度约15-20字符）
+    if (!tableId || !tableId.startsWith('tbl') || tableId.length < 10) {
+      console.error('表格ID格式不正确:', tableId);
+      throw new Error('表格ID格式不正确，请检查多维表格链接。表格ID应该以tbl开头');
     }
 
     // 写入多维表格
