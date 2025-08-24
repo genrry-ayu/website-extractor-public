@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maral Kunst 网站信息提取测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h2 {
+            color: #555;
+            margin-top: 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .loading {
+            color: #007bff;
+            font-style: italic;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .info-item {
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .info-value {
+            margin-top: 5px;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Maral Kunst 网站信息提取测试</h1>
+        
+        <div class="test-section">
+            <h2>📋 测试信息</h2>
+            <p><strong>目标网站:</strong> https://maralkunst.com/</p>
+            <p><strong>预期提取内容:</strong></p>
+            <ul>
+                <li>公司名称: Maral Kunst</li>
+                <li>地址: Schous Plass 7B, 0552 Oslo Norway</li>
+                <li>邮箱: maral@maralkunst.com</li>
+                <li>电话: +47 966 60 538</li>
+                <li>社交媒体链接 (Instagram, Facebook)</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>🚀 开始测试</h2>
+            <button id="testBtn" onclick="testExtraction()">开始提取信息</button>
+            <div id="result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 提取结果</h2>
+            <div id="extractedInfo" style="display: none;">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">公司名称:</div>
+                        <div class="info-value" id="companyName">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">地址:</div>
+                        <div class="info-value" id="address">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">邮箱:</div>
+                        <div class="info-value" id="email">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">电话:</div>
+                        <div class="info-value" id="phone">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Instagram:</div>
+                        <div class="info-value" id="instagram">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Facebook:</div>
+                        <div class="info-value" id="facebook">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function testExtraction() {
+            const testBtn = document.getElementById('testBtn');
+            const result = document.getElementById('result');
+            const extractedInfo = document.getElementById('extractedInfo');
+            
+            // 重置状态
+            testBtn.disabled = true;
+            testBtn.textContent = '提取中...';
+            result.style.display = 'block';
+            result.innerHTML = '<span class="loading">正在提取 Maral Kunst 网站信息...</span>';
+            extractedInfo.style.display = 'none';
+
+            try {
+                // 检测API端点
+                const apiEndpoint = getApiEndpoint();
+                console.log('使用API端点:', apiEndpoint);
+
+                const response = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        url: 'https://maralkunst.com/'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('API响应:', data);
+
+                if (data.success) {
+                    result.innerHTML = '<span class="success">✅ 提取成功!</span>';
+                    displayResults(data.results);
+                } else {
+                    throw new Error(data.error || '提取失败');
+                }
+
+            } catch (error) {
+                console.error('提取失败:', error);
+                result.innerHTML = `<span class="error">❌ 提取失败: ${error.message}</span>`;
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '重新提取';
+            }
+        }
+
+        function getApiEndpoint() {
+            // 检测是否为Netlify环境
+            if (window.location.hostname.includes('netlify.app')) {
+                return '/api/extract';
+            } else {
+                // 本地开发环境
+                return 'http://localhost:3000/api/extract';
+            }
+        }
+
+        function displayResults(data) {
+            document.getElementById('companyName').textContent = data.companyName || '未找到';
+            document.getElementById('address').textContent = data.address || '未找到';
+            document.getElementById('email').textContent = data.email || '未找到';
+            document.getElementById('phone').textContent = data.phone || '未找到';
+            document.getElementById('instagram').textContent = data.instagram?.length > 0 ? data.instagram.join(', ') : '未找到';
+            document.getElementById('facebook').textContent = data.facebook?.length > 0 ? data.facebook.join(', ') : '未找到';
+            
+            document.getElementById('extractedInfo').style.display = 'block';
+        }
+
+        // 页面加载时显示当前环境信息
+        window.addEventListener('load', () => {
+            const result = document.getElementById('result');
+            result.style.display = 'block';
+            result.innerHTML = `<span class="info">🌐 当前环境: ${window.location.hostname.includes('netlify.app') ? 'Netlify' : '本地开发'}</span>`;
+        });
+    </script>
+</body>
+</html>
