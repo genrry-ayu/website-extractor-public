@@ -86,29 +86,36 @@ class ConfigManager {
                 bitableUrl: formData.bitableUrl
             });
             
-            // 发送配置到服务器
+            // 发送配置到服务器（使用新的API端点）
             try {
-                // 转换字段名称以匹配API期望的格式
-                const apiData = {
-                    feishuAppId: formData.appId,
-                    feishuAppSecret: formData.appSecret,
-                    feishuTableId: this.extractTableIdFromUrl(formData.bitableUrl)
-                };
-                
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(apiData)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    this.showStatus('配置保存成功！服务器配置已更新', 'success');
+                // 检查用户是否登录
+                if (typeof netlifyIdentity !== 'undefined' && netlifyIdentity.currentUser()) {
+                    // 使用新的字段名和API端点
+                    const apiData = {
+                        appId: formData.appId,
+                        appSecret: formData.appSecret,
+                        tableId: this.extractTableIdFromUrl(formData.bitableUrl)
+                    };
+                    
+                    const token = await netlifyIdentity.currentUser().jwt();
+                    const response = await fetch('/.netlify/functions/config-save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(apiData)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.ok) {
+                        this.showStatus('配置保存成功！个人配置已更新', 'success');
+                    } else {
+                        this.showStatus('本地配置已保存，但个人配置更新失败: ' + result.error, 'error');
+                    }
                 } else {
-                    this.showStatus('本地配置已保存，但服务器配置更新失败: ' + result.error, 'error');
+                    this.showStatus('本地配置已保存，但需要登录才能保存个人配置', 'warning');
                 }
             } catch (serverError) {
                 console.error('服务器配置更新失败:', serverError);

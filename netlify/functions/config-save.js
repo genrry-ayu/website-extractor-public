@@ -37,7 +37,10 @@ exports.handler = async (event, context) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
-    const { appId, appSecret, tableId } = body || {};
+    // 兼容两套字段名：新版本 appId/appSecret/tableId，旧版本 feishuAppId/feishuAppSecret/feishuTableId
+    const appId     = body.appId     || body.feishuAppId;
+    const appSecret = body.appSecret || body.feishuAppSecret;
+    const tableId   = body.tableId   || body.feishuTableId;
     
     if (!appId || !appSecret || !tableId) {
       return { 

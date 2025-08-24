@@ -361,20 +361,29 @@ class WebsiteExtractor {
     // 检查配置状态
     async checkConfigStatus() {
         try {
-            const response = await fetch('/.netlify/functions/extract', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    url: 'https://example.com'
-                })
-            });
+            const user = netlifyIdentity.currentUser();
+            if (!user) {
+                console.log('用户未登录，跳过配置检查');
+                return;
+            }
+
+            const response = await this.authedFetch('/.netlify/functions/config-get');
+            if (!response.ok) {
+                if (response.status === 401) {
+                    console.log('用户未登录，需要重新登录');
+                    return;
+                }
+                if (response.status === 404) {
+                    console.log('用户已登录但未保存配置');
+                    return;
+                }
+                console.log('配置检查失败:', response.status);
+                return;
+            }
             
             const data = await response.json();
-            if (data.error === 'missing_config') {
-                console.log('系统配置未完成，需要设置环境变量');
-                // 可以在页面上显示配置提示
+            if (data.ok && data.config) {
+                console.log('用户配置已存在');
             }
         } catch (error) {
             console.log('配置检查失败:', error.message);
