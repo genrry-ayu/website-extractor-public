@@ -157,14 +157,34 @@ class WebsiteExtractor {
             const feishuConfig = this.getFeishuConfig();
             console.log('飞书配置状态:', feishuConfig ? '已配置' : '未配置');
             
-            // 使用带身份验证的fetch
-            const response = await this.authedFetch(apiEndpoint, {
-                method: 'POST',
-                body: JSON.stringify({ 
-                    url: url,
-                    feishuConfig: feishuConfig
-                })
-            });
+            // 根据登录状态选择fetch方式
+            const user = netlifyIdentity.currentUser();
+            let response;
+            
+            if (user) {
+                // 登录用户：使用带身份验证的fetch
+                console.log('使用身份验证fetch');
+                response = await this.authedFetch(apiEndpoint, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        url: url,
+                        feishuConfig: feishuConfig
+                    })
+                });
+            } else {
+                // 未登录用户：使用普通fetch
+                console.log('使用普通fetch');
+                response = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        url: url,
+                        feishuConfig: feishuConfig
+                    })
+                });
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);

@@ -28,14 +28,15 @@ function decrypt(b64) {
 async function getUserConfig(context, body) {
   // 1) 登录用户 => 读用户私有配置
   const user = context.clientContext?.user;
-  const store = getStore({ name: 'feishu-configs' });
   if (user) {
+    const store = getStore({ name: 'feishu-configs' });
     const ctext = await store.get(user.sub);
     if (ctext) {
       console.log(`使用用户 ${user.sub} 的私有配置`);
       return decrypt(ctext);
     }
   }
+  
   // 2) 兜底 => 用全局 env，可允许 tableId 由前端覆盖
   console.log('使用全局环境变量配置');
   return {
