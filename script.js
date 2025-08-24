@@ -48,9 +48,14 @@ class WebsiteExtractor {
             const config = this.decryptConfig(encryptedData);
             console.log('获取到飞书配置:', { 
                 feishuAppId: config.appId, 
-                feishuAppSecret: '***', 
+                feishuAppSecret: config.appSecret ? (config.appSecret.substring(0, 10) + '...') : '未设置', 
                 feishuTableId: config.bitableUrl 
             });
+            
+            // 检查App Secret长度
+            if (config.appSecret && config.appSecret.length < 20) {
+                console.warn('警告: App Secret长度异常，可能配置有误');
+            }
             
             return {
                 feishuAppId: config.appId,

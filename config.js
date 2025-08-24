@@ -80,6 +80,12 @@ class ConfigManager {
             const encryptedData = this.encrypt(formData);
             localStorage.setItem(this.storageKey, encryptedData);
             
+            console.log('配置保存成功:', {
+                appId: formData.appId,
+                appSecret: formData.appSecret.substring(0, 10) + '...',
+                bitableUrl: formData.bitableUrl
+            });
+            
             // 发送配置到服务器
             try {
                 // 转换字段名称以匹配API期望的格式
