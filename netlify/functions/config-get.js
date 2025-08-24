@@ -1,3 +1,4 @@
+// netlify/functions/config-get.js (CJS)
 const crypto = require('crypto');
 const { getStore } = require('@netlify/blobs');
 
@@ -15,62 +16,42 @@ function decrypt(b64) {
   const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
   return JSON.parse(dec.toString());
 }
-
-const mask = (s) => s ? s.slice(0,3) + '***' + s.slice(-2) : '';
+const mask = (s)=> s ? s.slice(0,3)+'***'+s.slice(-2) : '';
 
 exports.handler = async (event, context) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-  };
-
+  // 预检（跨源时）
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+    return { statusCode: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,content-type' } };
   }
 
   const user = context.clientContext?.user;
   if (!user) {
-    return { 
-      statusCode: 401, 
-      headers,
-      body: JSON.stringify({ ok: false, error: 'unauthorized' }) 
-    };
+    return { statusCode: 401, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'auth_required' }) };
   }
 
   try {
     const store = getStore({ name: 'feishu-configs' });
-    const cipherText = await store.get(user.sub);
-    
-    if (!cipherText) {
-      return { 
-        statusCode: 404, 
-        headers,
-        body: JSON.stringify({ ok: false, error: 'not_found' }) 
-      };
+    const ctext = await store.get(user.sub);
+    if (!ctext) {
+      return { statusCode: 404, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'not_found' }) };
     }
-    
-    const cfg = decrypt(cipherText);
-    console.log(`用户 ${user.sub} 配置已获取`);
-    
+
+    let cfg;
+    try {
+      cfg = decrypt(ctext);
+    } catch (e) {
+      console.error('config-get decrypt failed', String(e));
+      // 关键：不要 500，明确告诉前端是密钥不匹配/数据损坏
+      return { statusCode: 409, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'enc_key_mismatch' }) };
+    }
+
     return {
       statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        ok: true,
-        config: { 
-          appId: cfg.appId, 
-          appSecret: mask(cfg.appSecret), 
-          tableId: cfg.tableId 
-        }
-      })
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ok:true, config: { appId: cfg.appId, appSecret: mask(cfg.appSecret), tableId: cfg.tableId } })
     };
-  } catch (error) {
-    console.error('获取配置失败:', error);
-    return { 
-      statusCode: 500, 
-      headers,
-      body: JSON.stringify({ ok: false, error: 'server_error' }) 
-    };
+  } catch (e) {
+    console.error('config-get error', String(e));
+    return { statusCode: 500, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'internal_error' }) };
   }
 };

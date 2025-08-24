@@ -165,6 +165,10 @@ class WebsiteExtractor {
                         this.showError('请先在"配置"里保存你的飞书 AppID/Secret/TableId。');
                         return;
                     }
+                    if (status.reason === 'enc_key_mismatch') {
+                        this.showError('配置加密密钥已变更，请重新保存配置。');
+                        return;
+                    }
                     this.showError(`无法开始提取：${status.reason}`);
                     return;
                 }
@@ -239,6 +243,8 @@ class WebsiteExtractor {
                 ? '未找到你的个人配置，请先保存后重试。'
                 : e.message === 'auth_required'
                 ? '请先登录。'
+                : e.message === 'enc_key_mismatch'
+                ? '配置加密密钥已变更，请重新保存配置。'
                 : e.message === 'missing_config'
                 ? '需要配置飞书信息才能使用此功能。请先配置飞书应用信息。'
                 : e.message === 'missing_url'
@@ -427,7 +433,24 @@ class WebsiteExtractor {
             if (e.status === 404 || e.message === 'not_found') {
                 return { ok: false, reason: 'user_config_missing' };
             }
+            if (e.status === 409 || e.message === 'enc_key_mismatch') {
+                return { ok: false, reason: 'enc_key_mismatch' };
+            }
             return { ok: false, reason: e.message || 'unknown' };
+        }
+    }
+
+    // 清除用户配置
+    async clearUserConfig() {
+        try {
+            await this.authedFetch('/.netlify/functions/config-clear', {
+                method: 'POST'
+            });
+            console.log('用户配置已清除');
+            return { ok: true };
+        } catch (e) {
+            console.error('清除配置失败:', e);
+            return { ok: false, error: e.message };
         }
     }
 }
