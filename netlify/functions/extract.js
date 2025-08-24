@@ -1,6 +1,3 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
-
 exports.handler = async (event) => {
   console.log('Function triggered at:', new Date().toISOString());
   
