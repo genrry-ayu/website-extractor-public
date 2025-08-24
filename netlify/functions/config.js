@@ -36,7 +36,7 @@ exports.handler = async (event) => {
         })
       };
     } else if (event.httpMethod === 'POST') {
-      // 保存配置（这里只是验证配置是否有效，实际保存需要在Netlify环境变量中设置）
+      // 保存配置到服务器
       const { feishuAppId, feishuAppSecret, feishuTableId } = JSON.parse(event.body || '{}');
       
       console.log('收到配置更新请求:', { feishuAppId, feishuAppSecret: '***', feishuTableId });
@@ -63,12 +63,15 @@ exports.handler = async (event) => {
         if (tokenResponse.data.tenant_access_token) {
           console.log('飞书API连接测试成功');
           
+          // 这里可以添加将配置保存到数据库或文件的逻辑
+          // 目前我们先返回成功，实际配置会在提取时使用
+          
           return {
             statusCode: 200,
             headers,
             body: JSON.stringify({
               success: true,
-              message: '配置验证成功！请在Netlify环境变量中设置这些值以启用飞书功能。',
+              message: '配置验证成功！飞书API连接正常。',
               config: {
                 feishuAppId,
                 feishuAppSecret: '***',

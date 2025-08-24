@@ -34,6 +34,67 @@ class WebsiteExtractor {
         return '/api/extract';
     }
 
+    // 获取飞书配置
+    getFeishuConfig() {
+        try {
+            // 从localStorage获取加密的配置
+            const encryptedData = localStorage.getItem('feishu_config');
+            if (!encryptedData) {
+                console.log('未找到飞书配置');
+                return null;
+            }
+
+            // 解密配置
+            const config = this.decryptConfig(encryptedData);
+            console.log('获取到飞书配置:', { 
+                feishuAppId: config.appId, 
+                feishuAppSecret: '***', 
+                feishuTableId: config.bitableUrl 
+            });
+            
+            return {
+                feishuAppId: config.appId,
+                feishuAppSecret: config.appSecret,
+                feishuTableId: this.extractTableIdFromUrl(config.bitableUrl)
+            };
+        } catch (error) {
+            console.error('获取飞书配置失败:', error);
+            return null;
+        }
+    }
+
+    // 解密配置
+    decryptConfig(encryptedData) {
+        // 使用与config.js相同的解密逻辑
+        const key = 'your-secret-key-32-chars-long!!';
+        const decrypted = CryptoJS.AES.decrypt(encryptedData, key);
+        return JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
+    }
+
+    // 从多维表格URL中提取表格ID
+    extractTableIdFromUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            const pathParts = urlObj.pathname.split('/');
+            
+            // 查找包含base或wiki的路径部分
+            for (let i = 0; i < pathParts.length; i++) {
+                if (pathParts[i] === 'base' || pathParts[i] === 'wiki') {
+                    // 下一个部分通常是表格ID
+                    if (pathParts[i + 1]) {
+                        return pathParts[i + 1];
+                    }
+                }
+            }
+            
+            // 如果没找到，返回URL的最后一个部分
+            return pathParts[pathParts.length - 1] || url;
+        } catch (error) {
+            console.error('提取表格ID失败:', error);
+            return url; // 如果提取失败，返回原始URL
+        }
+    }
+
     async extractLinks() {
         const urlInput = document.getElementById('urlInput');
         const url = urlInput.value.trim();
@@ -57,12 +118,18 @@ class WebsiteExtractor {
             const apiEndpoint = this.getApiEndpoint();
             console.log('使用API端点:', apiEndpoint);
             
+            // 获取飞书配置
+            const feishuConfig = this.getFeishuConfig();
+            
             const response = await fetch(apiEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ url: url })
+                body: JSON.stringify({ 
+                    url: url,
+                    feishuConfig: feishuConfig
+                })
             });
 
             if (!response.ok) {

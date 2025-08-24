@@ -1,10 +1,10 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 
-// 飞书API配置
-const FEISHU_APP_ID = process.env.FEISHU_APP_ID;
-const FEISHU_APP_SECRET = process.env.FEISHU_APP_SECRET;
-const FEISHU_TABLE_ID = process.env.FEISHU_TABLE_ID;
+// 飞书API配置 - 从请求中获取或使用环境变量作为备用
+let FEISHU_APP_ID = process.env.FEISHU_APP_ID;
+let FEISHU_APP_SECRET = process.env.FEISHU_APP_SECRET;
+let FEISHU_TABLE_ID = process.env.FEISHU_TABLE_ID;
 
 exports.handler = async (event) => {
   const headers = {
@@ -21,16 +21,24 @@ exports.handler = async (event) => {
     };
   }
 
-  try {
-    const { url } = JSON.parse(event.body || '{}');
-    
-    if (!url) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'URL is required' })
-      };
-    }
+      try {
+      const { url, feishuConfig } = JSON.parse(event.body || '{}');
+      
+      if (!url) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'URL is required' })
+        };
+      }
+
+      // 如果请求中包含飞书配置，使用请求中的配置
+      if (feishuConfig) {
+        FEISHU_APP_ID = feishuConfig.feishuAppId;
+        FEISHU_APP_SECRET = feishuConfig.feishuAppSecret;
+        FEISHU_TABLE_ID = feishuConfig.feishuTableId;
+        console.log('使用请求中的飞书配置');
+      }
 
     console.log('开始提取网站信息:', url);
 
