@@ -1,6 +1,15 @@
 // netlify/functions/config-get.js
 const crypto = require('crypto');
-const { getStore } = require('@netlify/blobs');
+
+// Optional dependency: @netlify/blobs. If unavailable, config storage is
+// disabled and functions relying on it will return an error.
+let getStore;
+const isBlobsEnvMissing = (e) => e && e.name === 'MissingBlobsEnvironmentError';
+try {
+  ({ getStore } = require('@netlify/blobs'));
+} catch (_) {
+  console.warn('@netlify/blobs not found; configuration storage disabled');
+}
 
 const ENC_KEY = crypto.createHash('sha256')
   .update(process.env.CONFIG_ENC_KEY || 'dev-insecure-key-change-me')
@@ -29,8 +38,22 @@ exports.handler = async (event, context) => {
     return { statusCode: 401, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'auth_required' }) };
   }
 
+  if (!getStore) {
+    return { statusCode: 501, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'blobs_unavailable' }) };
+  }
+
+  let store;
   try {
-    const store = getStore({ name: 'feishu-configs' });
+    store = getStore({ name: 'feishu-configs' });
+  } catch (e) {
+    if (isBlobsEnvMissing(e)) {
+      return { statusCode: 501, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'blobs_unavailable' }) };
+    }
+    console.error('config-get store init error:', String(e));
+    return { statusCode: 500, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'internal_error' }) };
+  }
+
+  try {
     const ctext = await store.get(user.sub);
     if (!ctext) {
       return { statusCode: 404, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'not_found' }) };
@@ -51,6 +74,9 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ ok:true, config: { appId: cfg.appId, appSecret: mask(cfg.appSecret), tableId: cfg.tableId } })
     };
   } catch (e) {
+    if (isBlobsEnvMissing(e)) {
+      return { statusCode: 501, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'blobs_unavailable' }) };
+    }
     console.error('config-get internal error:', String(e));
     return { statusCode: 500, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'internal_error' }) };
   }

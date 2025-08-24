@@ -2,7 +2,17 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const crypto = require('crypto');
-const { getStore } = require('@netlify/blobs');
+
+// Attempt to load Netlify Blobs, but allow code to run if the module is not
+// available (for example, when the dependency isn't installed in a deployment
+// environment). In such cases we gracefully fall back to using only environment
+// variables for configuration.
+let getStore;
+try {
+  ({ getStore } = require('@netlify/blobs'));
+} catch (_) {
+  console.warn('@netlify/blobs not found; blob storage disabled');
+}
 
 const ENC_KEY = crypto.createHash('sha256')
   .update(process.env.CONFIG_ENC_KEY || 'dev-insecure-key-change-me')
@@ -28,7 +38,7 @@ function decrypt(b64) {
 async function readUserConfig(context) {
   try {
     const user = context.clientContext?.user;
-    if (!user) return null; // 未登录
+    if (!user || !getStore) return null; // 未登录或未启用 Blobs
     const store = getStore({ name: 'feishu-configs' });
     const ctext = await store.get(user.sub);
     return ctext ? decrypt(ctext) : null;

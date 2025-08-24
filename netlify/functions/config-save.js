@@ -1,6 +1,15 @@
 // netlify/functions/config-save.js
 const crypto = require('crypto');
-const { getStore } = require('@netlify/blobs');
+
+// Optional dependency: @netlify/blobs. If unavailable, storing configuration is
+// disabled and the function will return an error.
+let getStore;
+const isBlobsEnvMissing = (e) => e && e.name === 'MissingBlobsEnvironmentError';
+try {
+  ({ getStore } = require('@netlify/blobs'));
+} catch (_) {
+  console.warn('@netlify/blobs not found; configuration storage disabled');
+}
 
 const ENC_KEY = crypto.createHash('sha256')
   .update(process.env.CONFIG_ENC_KEY || 'dev-insecure-key-change-me')
@@ -21,23 +30,37 @@ exports.handler = async (event, context) => {
   }
 
   const user = context.clientContext?.user;
-  if (!user) return { statusCode: 401, body: JSON.stringify({ ok:false, error:'auth_required' }) };
+    if (!user) return { statusCode: 401, body: JSON.stringify({ ok:false, error:'auth_required' }) };
+    if (!getStore) return { statusCode: 501, body: JSON.stringify({ ok:false, error:'blobs_unavailable' }) };
 
-  try {
-    const body = JSON.parse(event.body || '{}');
-    const appId     = body.appId     || body.feishuAppId;
-    const appSecret = body.appSecret || body.feishuAppSecret;
-    const tableId   = body.tableId   || body.feishuTableId;
-    if (!appId || !appSecret || !tableId) {
-      return { statusCode: 400, body: JSON.stringify({ ok:false, error:'missing_fields' }) };
+    let store;
+    try {
+      store = getStore({ name: 'feishu-configs' });
+    } catch (e) {
+      if (isBlobsEnvMissing(e)) {
+        return { statusCode: 501, body: JSON.stringify({ ok:false, error:'blobs_unavailable' }) };
+      }
+      console.error('config-save store init error:', String(e));
+      return { statusCode: 500, body: JSON.stringify({ ok:false, error:'internal_error' }) };
     }
 
-    const store = getStore({ name: 'feishu-configs' });
-    await store.set(user.sub, encrypt({ appId, appSecret, tableId }));
+    try {
+      const body = JSON.parse(event.body || '{}');
+      const appId     = body.appId     || body.feishuAppId;
+      const appSecret = body.appSecret || body.feishuAppSecret;
+      const tableId   = body.tableId   || body.feishuTableId;
+      if (!appId || !appSecret || !tableId) {
+        return { statusCode: 400, body: JSON.stringify({ ok:false, error:'missing_fields' }) };
+      }
 
-    return { statusCode: 200, body: JSON.stringify({ ok:true }) };
-  } catch (e) {
-    console.error('config-save error:', String(e));
-    return { statusCode: 500, body: JSON.stringify({ ok:false, error:'internal_error' }) };
-  }
+      await store.set(user.sub, encrypt({ appId, appSecret, tableId }));
+
+      return { statusCode: 200, body: JSON.stringify({ ok:true }) };
+    } catch (e) {
+      if (isBlobsEnvMissing(e)) {
+        return { statusCode: 501, body: JSON.stringify({ ok:false, error:'blobs_unavailable' }) };
+      }
+      console.error('config-save error:', String(e));
+      return { statusCode: 500, body: JSON.stringify({ ok:false, error:'internal_error' }) };
+    }
 };
