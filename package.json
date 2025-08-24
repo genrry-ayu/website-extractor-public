@@ -19,6 +19,7 @@
   "author": "Website Info Extractor",
   "license": "MIT",
   "dependencies": {
+    "@netlify/blobs": "^10.0.8",
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
     "cors": "^2.8.5",

@@ -6,6 +6,7 @@ class WebsiteExtractor {
 
     init() {
         this.setupEventListeners();
+        this.setupIdentity();
     }
 
     setupEventListeners() {
@@ -156,11 +157,9 @@ class WebsiteExtractor {
             const feishuConfig = this.getFeishuConfig();
             console.log('飞书配置状态:', feishuConfig ? '已配置' : '未配置');
             
-            const response = await fetch(apiEndpoint, {
+            // 使用带身份验证的fetch
+            const response = await this.authedFetch(apiEndpoint, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({ 
                     url: url,
                     feishuConfig: feishuConfig
@@ -262,6 +261,70 @@ class WebsiteExtractor {
     truncateText(text, maxLength) {
         if (!text) return '';
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    }
+
+    // 设置身份验证
+    setupIdentity() {
+        // 登录按钮
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            netlifyIdentity.open('login');
+        });
+
+        // 退出按钮
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            netlifyIdentity.logout();
+        });
+
+        // 登录事件
+        netlifyIdentity.on('login', (user) => {
+            console.log('用户已登录:', user);
+            netlifyIdentity.close();
+            this.updateLoginStatus();
+        });
+
+        // 退出事件
+        netlifyIdentity.on('logout', () => {
+            console.log('用户已退出');
+            this.updateLoginStatus();
+        });
+
+        // 初始化登录状态
+        this.updateLoginStatus();
+    }
+
+    // 更新登录状态显示
+    updateLoginStatus() {
+        const user = netlifyIdentity.currentUser();
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        if (user) {
+            loginBtn.style.display = 'none';
+            logoutBtn.style.display = 'inline-block';
+            console.log('当前用户:', user.email);
+        } else {
+            loginBtn.style.display = 'inline-block';
+            logoutBtn.style.display = 'none';
+            console.log('用户未登录');
+        }
+    }
+
+    // 带身份验证的fetch
+    async authedFetch(path, options = {}) {
+        const user = netlifyIdentity.currentUser();
+        if (!user) {
+            throw new Error('用户未登录');
+        }
+        
+        const token = await user.jwt();
+        return fetch(path, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                ...(options.headers || {})
+            }
+        });
     }
 }
 

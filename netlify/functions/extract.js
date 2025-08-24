@@ -1,18 +1,54 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const crypto = require('crypto');
+const { getStore } = require('@netlify/blobs');
 
-// 飞书API配置 - 优先环境变量，允许前端覆盖非敏感项
+// 加密密钥
+const ENC_KEY = crypto.createHash('sha256')
+  .update(process.env.CONFIG_ENC_KEY || 'dev-insecure-key-change-me')
+  .digest();
+
+// 工具函数
 const pick = (v) => (typeof v === 'string' && v.trim()) ? v.trim() : undefined;
 const mask = (s) => s ? s.slice(0,3) + '***' + s.slice(-2) : '';
 
-let FEISHU_APP_ID = null;
-let FEISHU_APP_SECRET = null;
-let FEISHU_TABLE_ID = null;
+// 解密函数
+function decrypt(b64) {
+  const raw = Buffer.from(b64, 'base64');
+  const iv  = raw.subarray(0,12);
+  const tag = raw.subarray(12,28);
+  const enc = raw.subarray(28);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', ENC_KEY, iv);
+  decipher.setAuthTag(tag);
+  const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
+  return JSON.parse(dec.toString());
+}
 
-exports.handler = async (event) => {
+// 获取用户配置
+async function getUserConfig(context, body) {
+  // 1) 登录用户 => 读用户私有配置
+  const user = context.clientContext?.user;
+  const store = getStore({ name: 'feishu-configs' });
+  if (user) {
+    const ctext = await store.get(user.sub);
+    if (ctext) {
+      console.log(`使用用户 ${user.sub} 的私有配置`);
+      return decrypt(ctext);
+    }
+  }
+  // 2) 兜底 => 用全局 env，可允许 tableId 由前端覆盖
+  console.log('使用全局环境变量配置');
+  return {
+    appId:     process.env.FEISHU_APP_ID,
+    appSecret: process.env.FEISHU_APP_SECRET,
+    tableId:   body?.feishuConfig?.tableId || process.env.FEISHU_TABLE_ID,
+  };
+}
+
+exports.handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
   };
 
@@ -24,45 +60,44 @@ exports.handler = async (event) => {
     };
   }
 
-      try {
-      const { url, feishuConfig } = JSON.parse(event.body || '{}');
-      
-      if (!url) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({ error: 'URL is required' })
-        };
-      }
+  try {
+    const body = JSON.parse(event.body || '{}');
+    const { url } = body;
+    
+    if (!url) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'URL is required' })
+      };
+    }
 
-      // 配置优先级：环境变量 > 前端传递（仅允许非敏感项）
-      const appId = process.env.FEISHU_APP_ID || pick(feishuConfig?.feishuAppId);
-      const appSecret = process.env.FEISHU_APP_SECRET; // 不允许前端覆盖
-      const tableId = pick(feishuConfig?.feishuTableId) || process.env.FEISHU_TABLE_ID;
-      
-      FEISHU_APP_ID = appId;
-      FEISHU_APP_SECRET = appSecret;
-      FEISHU_TABLE_ID = tableId;
-      
-      console.log('飞书配置状态:', {
-        appId: appId ? '已设置' : '未设置',
-        appSecret: appSecret ? '已设置' : '未设置',
-        tableId: tableId ? '已设置' : '未设置',
-        source: {
-          appId: appId === process.env.FEISHU_APP_ID ? '环境变量' : '前端传递',
-          appSecret: '环境变量',
-          tableId: tableId === process.env.FEISHU_TABLE_ID ? '环境变量' : '前端传递'
-        }
+    // 获取用户配置
+    const cfg = await getUserConfig(context, body);
+    
+    console.log('飞书配置状态:', {
+      appId: cfg.appId ? '已设置' : '未设置',
+      appSecret: cfg.appSecret ? '已设置' : '未设置',
+      tableId: cfg.tableId ? '已设置' : '未设置'
+    });
+    
+    // 验证必要配置
+    if (!cfg.appId || !cfg.appSecret || !cfg.tableId) {
+      console.log('配置验证失败:', {
+        appId: !!cfg.appId,
+        appSecret: !!cfg.appSecret,
+        tableId: !!cfg.tableId
       });
-      
-      // 验证必要配置
-      if (!appId || !appSecret || !tableId) {
-        console.log('配置验证失败:', {
-          appId: !!appId,
-          appSecret: !!appSecret,
-          tableId: !!tableId
-        });
-      }
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          success: false, 
+          error: 'missing_config',
+          message: '缺少必要的飞书配置'
+        })
+      };
+    }
 
     console.log('开始提取网站信息:', url);
 
@@ -87,15 +122,11 @@ exports.handler = async (event) => {
 
     // 尝试写入飞书多维表格
     let feishuSuccess = false;
-    if (FEISHU_APP_ID && FEISHU_APP_SECRET && FEISHU_TABLE_ID) {
-      try {
-        feishuSuccess = await writeToFeishu(websiteInfo);
-        console.log('飞书写入结果:', feishuSuccess);
-      } catch (feishuError) {
-        console.error('飞书写入失败:', feishuError.message);
-      }
-    } else {
-      console.log('未配置飞书信息，跳过飞书写入');
+    try {
+      feishuSuccess = await writeToFeishu(websiteInfo, cfg);
+      console.log('飞书写入结果:', feishuSuccess);
+    } catch (feishuError) {
+      console.error('飞书写入失败:', feishuError.message);
     }
 
     return {
@@ -345,18 +376,19 @@ async function extractWebsiteInfo($, url) {
   };
 }
 
-async function writeToFeishu(data) {
+async function writeToFeishu(data, cfg) {
   try {
     console.log('开始写入飞书多维表格...');
-    console.log('使用配置:', { 
-      appId: FEISHU_APP_ID, 
-      tableId: FEISHU_TABLE_ID 
+    console.log('使用配置:', {
+      appId: cfg.appId,
+      tableId: cfg.tableId,
+      appSecret: mask(cfg.appSecret)
     });
 
     // 获取飞书访问令牌
     const tokenResponse = await axios.post('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
-      app_id: FEISHU_APP_ID,
-      app_secret: FEISHU_APP_SECRET
+      app_id: cfg.appId,
+      app_secret: cfg.appSecret
     });
 
     if (!tokenResponse.data.tenant_access_token) {
@@ -366,10 +398,10 @@ async function writeToFeishu(data) {
     const accessToken = tokenResponse.data.tenant_access_token;
     console.log('成功获取飞书访问令牌');
 
-    // 使用从URL中提取的表格ID
-    const tableId = FEISHU_TABLE_ID;
-    console.log('使用从URL提取的表格ID:', tableId);
-    
+        // 使用配置中的表格ID
+    const tableId = cfg.tableId;
+    console.log('使用表格ID:', tableId);
+
     // 验证表格ID格式（飞书表格ID通常以tbl开头，长度约15-20字符）
     if (!tableId || !tableId.startsWith('tbl') || tableId.length < 10) {
       console.error('表格ID格式不正确:', tableId);
@@ -398,7 +430,7 @@ async function writeToFeishu(data) {
     let writeResponse;
     try {
       writeResponse = await axios.post(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables/${tableId}/records`,
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${cfg.appId}/tables/${tableId}/records`,
         recordData,
         {
           headers: {
