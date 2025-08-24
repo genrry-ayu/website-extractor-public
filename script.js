@@ -212,7 +212,13 @@ class WebsiteExtractor {
         } catch (error) {
             console.error('提取失败:', error);
             this.hideLoading();
-            this.showError('提取失败: ' + error.message);
+            
+            // 检查是否是配置缺失错误
+            if (error.message.includes('missing_config') || error.message.includes('缺少必要的飞书配置')) {
+                this.showError('需要配置飞书信息才能使用此功能。请先配置飞书应用信息。');
+            } else {
+                this.showError('提取失败: ' + error.message);
+            }
         }
     }
 
@@ -310,6 +316,9 @@ class WebsiteExtractor {
 
         // 初始化登录状态
         this.updateLoginStatus();
+        
+        // 检查配置状态
+        this.checkConfigStatus();
     }
 
     // 更新登录状态显示
@@ -345,6 +354,29 @@ class WebsiteExtractor {
                 ...(options.headers || {})
             }
         });
+    }
+
+    // 检查配置状态
+    async checkConfigStatus() {
+        try {
+            const response = await fetch('/.netlify/functions/extract', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    url: 'https://example.com'
+                })
+            });
+            
+            const data = await response.json();
+            if (data.error === 'missing_config') {
+                console.log('系统配置未完成，需要设置环境变量');
+                // 可以在页面上显示配置提示
+            }
+        } catch (error) {
+            console.log('配置检查失败:', error.message);
+        }
     }
 }
 
