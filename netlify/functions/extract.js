@@ -37,7 +37,13 @@ exports.handler = async (event) => {
         FEISHU_APP_ID = feishuConfig.feishuAppId;
         FEISHU_APP_SECRET = feishuConfig.feishuAppSecret;
         FEISHU_TABLE_ID = feishuConfig.feishuTableId;
-        console.log('使用请求中的飞书配置');
+        console.log('使用请求中的飞书配置:', {
+          appId: FEISHU_APP_ID ? '已设置' : '未设置',
+          appSecret: FEISHU_APP_SECRET ? '已设置' : '未设置',
+          tableId: FEISHU_TABLE_ID ? '已设置' : '未设置'
+        });
+      } else {
+        console.log('请求中未包含飞书配置');
       }
 
     console.log('开始提取网站信息:', url);
