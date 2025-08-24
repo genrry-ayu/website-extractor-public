@@ -82,12 +82,19 @@ class ConfigManager {
             
             // 发送配置到服务器
             try {
+                // 转换字段名称以匹配API期望的格式
+                const apiData = {
+                    feishuAppId: formData.appId,
+                    feishuAppSecret: formData.appSecret,
+                    feishuTableId: this.extractTableIdFromUrl(formData.bitableUrl)
+                };
+                
                 const response = await fetch('/api/config', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify(apiData)
                 });
                 
                 const result = await response.json();
@@ -145,6 +152,30 @@ class ConfigManager {
                    (urlObj.pathname.includes('/wiki/') || urlObj.pathname.includes('/base/'));
         } catch (error) {
             return false;
+        }
+    }
+    
+    // 从多维表格URL中提取表格ID
+    extractTableIdFromUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            const pathParts = urlObj.pathname.split('/');
+            
+            // 查找包含base或wiki的路径部分
+            for (let i = 0; i < pathParts.length; i++) {
+                if (pathParts[i] === 'base' || pathParts[i] === 'wiki') {
+                    // 下一个部分通常是表格ID
+                    if (pathParts[i + 1]) {
+                        return pathParts[i + 1];
+                    }
+                }
+            }
+            
+            // 如果没找到，返回URL的最后一个部分
+            return pathParts[pathParts.length - 1] || url;
+        } catch (error) {
+            console.error('提取表格ID失败:', error);
+            return url; // 如果提取失败，返回原始URL
         }
     }
     
