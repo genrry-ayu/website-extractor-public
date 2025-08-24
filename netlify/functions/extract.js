@@ -29,11 +29,15 @@ async function getUserConfig(context, body) {
   // 1) 登录用户 => 读用户私有配置
   const user = context.clientContext?.user;
   if (user) {
-    const store = getStore({ name: 'feishu-configs' });
-    const ctext = await store.get(user.sub);
-    if (ctext) {
-      console.log(`使用用户 ${user.sub} 的私有配置`);
-      return decrypt(ctext);
+    try {
+      const store = getStore({ name: 'feishu-configs' });
+      const ctext = await store.get(user.sub);
+      if (ctext) {
+        console.log(`使用用户 ${user.sub} 的私有配置`);
+        return decrypt(ctext);
+      }
+    } catch (blobsError) {
+      console.log('Blobs未配置或出错，使用环境变量:', blobsError.message);
     }
   }
   
