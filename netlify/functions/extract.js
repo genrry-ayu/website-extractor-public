@@ -1,7 +1,10 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 
-// 飞书API配置 - 完全从请求中获取
+// 飞书API配置 - 优先环境变量，允许前端覆盖非敏感项
+const pick = (v) => (typeof v === 'string' && v.trim()) ? v.trim() : undefined;
+const mask = (s) => s ? s.slice(0,3) + '***' + s.slice(-2) : '';
+
 let FEISHU_APP_ID = null;
 let FEISHU_APP_SECRET = null;
 let FEISHU_TABLE_ID = null;
@@ -32,18 +35,33 @@ exports.handler = async (event) => {
         };
       }
 
-      // 如果请求中包含飞书配置，使用请求中的配置
-      if (feishuConfig) {
-        FEISHU_APP_ID = feishuConfig.feishuAppId;
-        FEISHU_APP_SECRET = feishuConfig.feishuAppSecret;
-        FEISHU_TABLE_ID = feishuConfig.feishuTableId;
-        console.log('使用请求中的飞书配置:', {
-          appId: FEISHU_APP_ID ? '已设置' : '未设置',
-          appSecret: FEISHU_APP_SECRET ? '已设置' : '未设置',
-          tableId: FEISHU_TABLE_ID ? '已设置' : '未设置'
+      // 配置优先级：环境变量 > 前端传递（仅允许非敏感项）
+      const appId = process.env.FEISHU_APP_ID || pick(feishuConfig?.feishuAppId);
+      const appSecret = process.env.FEISHU_APP_SECRET; // 不允许前端覆盖
+      const tableId = pick(feishuConfig?.feishuTableId) || process.env.FEISHU_TABLE_ID;
+      
+      FEISHU_APP_ID = appId;
+      FEISHU_APP_SECRET = appSecret;
+      FEISHU_TABLE_ID = tableId;
+      
+      console.log('飞书配置状态:', {
+        appId: appId ? '已设置' : '未设置',
+        appSecret: appSecret ? '已设置' : '未设置',
+        tableId: tableId ? '已设置' : '未设置',
+        source: {
+          appId: appId === process.env.FEISHU_APP_ID ? '环境变量' : '前端传递',
+          appSecret: '环境变量',
+          tableId: tableId === process.env.FEISHU_TABLE_ID ? '环境变量' : '前端传递'
+        }
+      });
+      
+      // 验证必要配置
+      if (!appId || !appSecret || !tableId) {
+        console.log('配置验证失败:', {
+          appId: !!appId,
+          appSecret: !!appSecret,
+          tableId: !!tableId
         });
-      } else {
-        console.log('请求中未包含飞书配置');
       }
 
     console.log('开始提取网站信息:', url);

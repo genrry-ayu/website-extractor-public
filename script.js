@@ -58,8 +58,6 @@ class WebsiteExtractor {
             }
             
             return {
-                feishuAppId: config.appId,
-                feishuAppSecret: config.appSecret,
                 feishuTableId: this.extractTableIdFromUrl(config.bitableUrl)
             };
         } catch (error) {
