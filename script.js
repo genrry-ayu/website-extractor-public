@@ -38,7 +38,7 @@ class WebsiteExtractor {
     getFeishuConfig() {
         try {
             // 从localStorage获取加密的配置
-            const encryptedData = localStorage.getItem('feishu_config');
+            const encryptedData = localStorage.getItem('feishu_config_encrypted');
             if (!encryptedData) {
                 console.log('未找到飞书配置');
                 return null;
@@ -65,8 +65,13 @@ class WebsiteExtractor {
 
     // 解密配置
     decryptConfig(encryptedData) {
-        // 使用与config.js相同的解密逻辑
-        const key = 'your-secret-key-32-chars-long!!';
+        // 使用与config.js相同的加密密钥生成方式
+        const userAgent = navigator.userAgent;
+        const screenInfo = `${screen.width}x${screen.height}`;
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const baseString = `${userAgent}|${screenInfo}|${timezone}|feishu_config`;
+        const key = CryptoJS.SHA256(baseString).toString();
+        
         const decrypted = CryptoJS.AES.decrypt(encryptedData, key);
         return JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
     }
@@ -120,6 +125,7 @@ class WebsiteExtractor {
             
             // 获取飞书配置
             const feishuConfig = this.getFeishuConfig();
+            console.log('飞书配置状态:', feishuConfig ? '已配置' : '未配置');
             
             const response = await fetch(apiEndpoint, {
                 method: 'POST',

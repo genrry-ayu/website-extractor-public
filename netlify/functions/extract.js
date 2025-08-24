@@ -1,10 +1,10 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 
-// 飞书API配置 - 从请求中获取或使用环境变量作为备用
-let FEISHU_APP_ID = process.env.FEISHU_APP_ID;
-let FEISHU_APP_SECRET = process.env.FEISHU_APP_SECRET;
-let FEISHU_TABLE_ID = process.env.FEISHU_TABLE_ID;
+// 飞书API配置 - 完全从请求中获取
+let FEISHU_APP_ID = null;
+let FEISHU_APP_SECRET = null;
+let FEISHU_TABLE_ID = null;
 
 exports.handler = async (event) => {
   const headers = {
@@ -70,6 +70,8 @@ exports.handler = async (event) => {
       } catch (feishuError) {
         console.error('飞书写入失败:', feishuError.message);
       }
+    } else {
+      console.log('未配置飞书信息，跳过飞书写入');
     }
 
     return {
@@ -321,28 +323,41 @@ async function extractWebsiteInfo($, url) {
 
 async function writeToFeishu(data) {
   try {
+    console.log('开始写入飞书多维表格...');
+    console.log('使用配置:', { 
+      appId: FEISHU_APP_ID, 
+      tableId: FEISHU_TABLE_ID 
+    });
+
     // 获取飞书访问令牌
     const tokenResponse = await axios.post('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
       app_id: FEISHU_APP_ID,
       app_secret: FEISHU_APP_SECRET
     });
 
+    if (!tokenResponse.data.tenant_access_token) {
+      throw new Error('无法获取飞书访问令牌');
+    }
+
     const accessToken = tokenResponse.data.tenant_access_token;
+    console.log('成功获取飞书访问令牌');
 
     // 写入多维表格
     const recordData = {
       fields: {
-        '网站URL': data.url,
-        '公司名称': data.companyName,
-        '描述': data.description,
-        '地址': data.address,
-        '邮箱': data.email,
-        '电话': data.phone,
-        'Instagram': data.instagram.join(', '),
-        'Facebook': data.facebook.join(', '),
+        '网站URL': data.url || '',
+        '公司名称': data.companyName || '',
+        '描述': data.description || '',
+        '地址': data.address || '',
+        '邮箱': data.email || '',
+        '电话': data.phone || '',
+        'Instagram': data.instagram?.join(', ') || '',
+        'Facebook': data.facebook?.join(', ') || '',
         '提取时间': new Date().toISOString()
       }
     };
+
+    console.log('准备写入数据:', recordData);
 
     const writeResponse = await axios.post(
       `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_TABLE_ID}/tables/${FEISHU_TABLE_ID}/records`,
@@ -355,6 +370,7 @@ async function writeToFeishu(data) {
       }
     );
 
+    console.log('飞书API响应:', writeResponse.status, writeResponse.data);
     return writeResponse.status === 200;
   } catch (error) {
     console.error('飞书API错误:', error.response?.data || error.message);

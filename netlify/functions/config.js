@@ -36,10 +36,10 @@ exports.handler = async (event) => {
         })
       };
     } else if (event.httpMethod === 'POST') {
-      // 保存配置到服务器
+      // 验证飞书配置
       const { feishuAppId, feishuAppSecret, feishuTableId } = JSON.parse(event.body || '{}');
       
-      console.log('收到配置更新请求:', { feishuAppId, feishuAppSecret: '***', feishuTableId });
+      console.log('收到配置验证请求:', { feishuAppId, feishuAppSecret: '***', feishuTableId });
 
       // 验证配置是否有效
       if (!feishuAppId || !feishuAppSecret || !feishuTableId) {
@@ -62,9 +62,6 @@ exports.handler = async (event) => {
 
         if (tokenResponse.data.tenant_access_token) {
           console.log('飞书API连接测试成功');
-          
-          // 这里可以添加将配置保存到数据库或文件的逻辑
-          // 目前我们先返回成功，实际配置会在提取时使用
           
           return {
             statusCode: 200,
