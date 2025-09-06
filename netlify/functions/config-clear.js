@@ -22,7 +22,13 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const store = getStore({ name: 'feishu-configs' });
+    let store;
+    try {
+      store = getStore({ name: 'feishu-configs' });
+    } catch (e) {
+      console.error('config-clear storage error:', String(e));
+      return { statusCode: 503, body: JSON.stringify({ ok:false, error:'storage_unavailable' }) };
+    }
     await store.delete(user.sub);
     console.log(`用户 ${user.sub} 配置已清除`);
     

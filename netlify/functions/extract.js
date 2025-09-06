@@ -213,10 +213,28 @@ async function writeToFeishu(data, cfg) {
     console.log('准备写入数据:', recordData);
     console.log('目标表格ID:', tableId);
 
+    // 解析 appToken：如果传入的是 Wiki 节点 token，则解析为真实的多维表格 App Token
+    async function resolveAppToken(maybeToken) {
+      if (!maybeToken) return undefined;
+      try {
+        const nodeResp = await axios.get('https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node', {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+          params: { token: maybeToken, obj_type: 'wiki' }
+        });
+        if (nodeResp.data?.code === 0 && nodeResp.data?.data?.node?.obj_type === 'bitable') {
+          const realToken = nodeResp.data.data.node.obj_token;
+          console.log('解析到真实Bitable App Token:', realToken);
+          return realToken;
+        }
+      } catch (_) {}
+      return maybeToken;
+    }
+
     // 尝试写入记录
     let writeResponse;
     try {
-      const appToken = cfg.bitableAppToken || cfg.appId; // 兼容旧配置，优先使用bitableAppToken
+      const appTokenRaw = cfg.bitableAppToken || cfg.appId; // 兼容旧配置
+      const appToken = await resolveAppToken(appTokenRaw);
       writeResponse = await axios.post(
         `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`,
         recordData,
@@ -316,17 +334,9 @@ exports.handler = async (event, context) => {
       tableId: tableId
     });
 
-    if (!appId || !appSecret || !tableId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          ok: false,
-          error: "missing_config",
-          message: "缺少必要的飞书配置",
-          fields: { appId: !!appId, appSecret: !!appSecret, tableId: !!tableId, bitableAppToken: !!bitableAppToken }
-        })
-      };
+    const canWriteFeishu = !!(appId && appSecret && tableId);
+    if (!canWriteFeishu) {
+      console.warn('缺少飞书配置，跳过写入，仅返回提取结果');
     }
 
     console.log("extract start", { requestId, hasUserCfg: !!userCfg, tableId });
@@ -350,11 +360,19 @@ exports.handler = async (event, context) => {
 
     // 尝试写入飞书多维表格
     let feishuSuccess = false;
-    try {
-      feishuSuccess = await writeToFeishu(websiteInfo, { appId, appSecret, tableId, bitableAppToken });
-      console.log('飞书写入结果:', feishuSuccess);
-    } catch (feishuError) {
-      console.error('飞书写入失败:', feishuError.message);
+    let feishuStatus = 'skipped';
+    let feishuMessage = '未配置飞书，已跳过写入';
+    if (canWriteFeishu) {
+      try {
+        feishuSuccess = await writeToFeishu(websiteInfo, { appId, appSecret, tableId, bitableAppToken });
+        feishuStatus = feishuSuccess ? 'success' : 'failed';
+        feishuMessage = feishuSuccess ? '写入成功' : '写入失败';
+        console.log('飞书写入结果:', feishuSuccess);
+      } catch (feishuError) {
+        feishuStatus = 'failed';
+        feishuMessage = feishuError?.message || '写入失败';
+        console.error('飞书写入失败:', feishuError.message);
+      }
     }
 
     console.log("extract end", { requestId, written: feishuSuccess ? 1 : 0 });
@@ -367,7 +385,9 @@ exports.handler = async (event, context) => {
         requestId,
         url: url,
         results: websiteInfo,
-        feishuSuccess: feishuSuccess
+        feishuSuccess: feishuSuccess,
+        feishuStatus,
+        feishuMessage
       })
     };
 

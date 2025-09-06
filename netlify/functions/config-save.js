@@ -33,8 +33,14 @@ exports.handler = async (event, context) => {
       return { statusCode: 400, body: JSON.stringify({ ok:false, error:'missing_fields' }) };
     }
 
-    const store = getStore({ name: 'feishu-configs' });
-    await store.set(user.sub, encrypt({ appId, appSecret, tableId, bitableAppToken }));
+    let store;
+    try {
+      store = getStore({ name: 'feishu-configs' });
+      await store.set(user.sub, encrypt({ appId, appSecret, tableId, bitableAppToken }));
+    } catch (storageErr) {
+      console.error('config-save storage error:', String(storageErr));
+      return { statusCode: 503, body: JSON.stringify({ ok:false, error:'storage_unavailable', message:'Netlify Blobs storage is not available on this site' }) };
+    }
 
     return { statusCode: 200, body: JSON.stringify({ ok:true }) };
   } catch (e) {

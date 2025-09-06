@@ -198,8 +198,10 @@ class WebsiteExtractor {
                 this.hideLoading();
                 
                 // 显示飞书状态
-                if (data.feishuSuccess) {
+                if (data.feishuStatus === 'success' || data.feishuSuccess) {
                     this.showFeishuSuccess();
+                } else if (data.feishuStatus === 'skipped') {
+                    this.showFeishuInfo(data.feishuMessage || '未配置飞书，已跳过写入');
                 } else {
                     this.showFeishuError();
                 }
@@ -226,8 +228,10 @@ class WebsiteExtractor {
                     this.displayResults(websiteInfo);
                     this.hideLoading();
                     
-                    if (data.feishuSuccess) {
+                    if (data.feishuStatus === 'success' || data.feishuSuccess) {
                         this.showFeishuSuccess();
+                    } else if (data.feishuStatus === 'skipped') {
+                        this.showFeishuInfo(data.feishuMessage || '未配置飞书，已跳过写入');
                     } else {
                         this.showFeishuError();
                     }
@@ -247,6 +251,8 @@ class WebsiteExtractor {
                 ? '配置加密密钥已变更，请重新保存配置。'
                 : e.message === 'missing_config'
                 ? '需要配置飞书信息才能使用此功能。请先配置飞书应用信息。'
+                : e.message === 'storage_unavailable'
+                ? '后端存储未启用，无法保存用户配置。但已返回提取结果。'
                 : e.message === 'missing_url'
                 ? '请输入有效的网站URL。'
                 : `提取失败（${e.message}）`;
@@ -287,20 +293,40 @@ class WebsiteExtractor {
         const statusDiv = document.getElementById('feishuStatus');
         const successDiv = document.getElementById('feishuSuccess');
         const errorDiv = document.getElementById('feishuError');
+        const infoDiv = document.getElementById('feishuInfo');
 
         statusDiv.style.display = 'block';
         successDiv.style.display = 'block';
         errorDiv.style.display = 'none';
+        if (infoDiv) infoDiv.style.display = 'none';
     }
 
     showFeishuError() {
         const statusDiv = document.getElementById('feishuStatus');
         const successDiv = document.getElementById('feishuSuccess');
         const errorDiv = document.getElementById('feishuError');
+        const infoDiv = document.getElementById('feishuInfo');
 
         statusDiv.style.display = 'block';
         successDiv.style.display = 'none';
         errorDiv.style.display = 'block';
+        if (infoDiv) infoDiv.style.display = 'none';
+    }
+
+    showFeishuInfo(message) {
+        const statusDiv = document.getElementById('feishuStatus');
+        const successDiv = document.getElementById('feishuSuccess');
+        const errorDiv = document.getElementById('feishuError');
+        const infoDiv = document.getElementById('feishuInfo');
+
+        statusDiv.style.display = 'block';
+        if (successDiv) successDiv.style.display = 'none';
+        if (errorDiv) errorDiv.style.display = 'none';
+        if (infoDiv) {
+            infoDiv.style.display = 'block';
+            const span = infoDiv.querySelector('span');
+            if (span) span.textContent = message;
+        }
     }
 
     showLoading() {
@@ -427,6 +453,9 @@ class WebsiteExtractor {
             }
             if (e.status === 409 || e.message === 'enc_key_mismatch') {
                 return { ok: false, reason: 'enc_key_mismatch' };
+            }
+            if (e.status === 503 || e.message === 'storage_unavailable') {
+                return { ok: false, reason: 'storage_unavailable' };
             }
             return { ok: false, reason: e.message || 'unknown' };
         }
