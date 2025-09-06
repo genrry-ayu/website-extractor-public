@@ -29,7 +29,7 @@ async function readUserConfig(context) {
   try {
     const user = context.clientContext?.user;
     if (!user) return null; // 未登录
-    const store = getStore({ name: 'feishu-configs' });
+    const store = getStore('feishu-configs');
     const ctext = await store.get(user.sub);
     return ctext ? decrypt(ctext) : null;
   } catch (_) {

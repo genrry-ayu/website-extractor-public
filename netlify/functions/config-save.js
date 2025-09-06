@@ -35,7 +35,8 @@ exports.handler = async (event, context) => {
 
     let store;
     try {
-      store = getStore({ name: 'feishu-configs' });
+      // Use string form per latest Netlify Blobs API
+      store = getStore('feishu-configs');
       await store.set(user.sub, encrypt({ appId, appSecret, tableId, bitableAppToken }));
     } catch (storageErr) {
       console.error('config-save storage error:', String(storageErr));

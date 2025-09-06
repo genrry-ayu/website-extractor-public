@@ -32,7 +32,7 @@ exports.handler = async (event, context) => {
   try {
     let store;
     try {
-      store = getStore({ name: 'feishu-configs' });
+      store = getStore('feishu-configs');
     } catch (e) {
       console.error('config-get storage error:', String(e));
       return { statusCode: 503, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:'storage_unavailable' }) };
