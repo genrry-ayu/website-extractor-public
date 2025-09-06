@@ -86,56 +86,8 @@ class ConfigManager {
                 bitableUrl: formData.bitableUrl
             });
             
-            // 发送配置到服务器（使用新的API端点）
-            try {
-                // 检查用户是否登录
-                if (typeof netlifyIdentity === 'undefined') {
-                    this.showStatus('需要加载 Netlify Identity 组件。请刷新后重试。', 'error');
-                    return;
-                }
-
-                let user = netlifyIdentity.currentUser();
-                if (!user) {
-                    // 未登录 -> 弹出登录框
-                    netlifyIdentity.open('login');
-                    await new Promise(resolve => {
-                        const onLogin = () => { netlifyIdentity.off('login', onLogin); resolve(); };
-                        netlifyIdentity.on('login', onLogin);
-                    });
-                    user = netlifyIdentity.currentUser();
-                }
-
-                if (user) {
-                    // 发送到函数：包含 tableId 和（若可解析到）bitableAppToken
-                    const apiData = {
-                        appId: formData.appId,
-                        appSecret: formData.appSecret,
-                        tableId: this.extractTableIdFromUrl(formData.bitableUrl),
-                        bitableAppToken: this.extractAppTokenFromUrl(formData.bitableUrl)
-                    };
-
-                    const token = await user.jwt();
-                    const response = await fetch('/.netlify/functions/config-save', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify(apiData)
-                    });
-
-                    const result = await response.json();
-
-                    if (result.ok) {
-                        this.showStatus('配置保存成功！个人配置已更新', 'success');
-                    } else {
-                        this.showStatus('本地配置已保存，但个人配置更新失败: ' + result.error, 'error');
-                    }
-                }
-            } catch (serverError) {
-                console.error('服务器配置更新失败:', serverError);
-                this.showStatus('本地配置已保存，但服务器配置更新失败', 'error');
-            }
+            // 本地优先：不再依赖服务器保存个人配置
+            this.showStatus('配置已保存（本地）。提取时将直接使用本地配置写入飞书。', 'success');
             
             // 3秒后自动返回主页
             setTimeout(() => {

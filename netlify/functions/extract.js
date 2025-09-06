@@ -318,14 +318,16 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // 1) 登录用户 → 读私有配置；2) 未登录/无私有配置 → 用 ENV；允许仅 tableId 从 body 覆盖
+    // 配置优先级：请求体(feishuConfig) > 用户私有配置 > 环境变量
     const userCfg = await readUserConfig(context);
-    const appId            = (userCfg && userCfg.appId)            || process.env.FEISHU_APP_ID;
-    const appSecret        = (userCfg && userCfg.appSecret)        || process.env.FEISHU_APP_SECRET;
-    const tableId          = (userCfg && userCfg.tableId)          || body?.feishuConfig?.tableId || process.env.FEISHU_TABLE_ID;
-    const bitableAppToken  = (userCfg && userCfg.bitableAppToken)  || body?.feishuConfig?.bitableAppToken || process.env.FEISHU_BITABLE_APP_TOKEN;
+    const bodyCfg = body?.feishuConfig || {};
+    const appId            = bodyCfg.appId            || (userCfg && userCfg.appId)            || process.env.FEISHU_APP_ID;
+    const appSecret        = bodyCfg.appSecret        || (userCfg && userCfg.appSecret)        || process.env.FEISHU_APP_SECRET;
+    const tableId          = bodyCfg.tableId          || (userCfg && userCfg.tableId)          || process.env.FEISHU_TABLE_ID;
+    const bitableAppToken  = bodyCfg.bitableAppToken  || (userCfg && userCfg.bitableAppToken)  || process.env.FEISHU_BITABLE_APP_TOKEN;
 
     console.log('配置状态:', {
+      hasBodyCfg: !!bodyCfg && (!!bodyCfg.appId || !!bodyCfg.tableId || !!bodyCfg.bitableAppToken),
       hasUserCfg: !!userCfg,
       hasAppId: !!appId,
       hasAppSecret: !!appSecret,

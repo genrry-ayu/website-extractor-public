@@ -130,6 +130,17 @@ class WebsiteExtractor {
         }
     }
 
+    // 从URL中解析 appToken（wiki 节点 token 或 base app token）
+    extractAppTokenFromUrl(url) {
+        try {
+            const m1 = url.match(/\/wiki\/([A-Za-z0-9]+)/);
+            if (m1 && m1[1]) return m1[1];
+            const m2 = url.match(/\/base\/([A-Za-z0-9]+)/);
+            if (m2 && m2[1]) return m2[1];
+        } catch (_) {}
+        return undefined;
+    }
+
     async extractLinks() {
         const urlInput = document.getElementById('urlInput');
         const url = urlInput.value.trim();
@@ -150,54 +161,31 @@ class WebsiteExtractor {
         this.showLoading();
 
         try {
-            // 1) 先确保已登录 & 已配置
-            const user = netlifyIdentity.currentUser();
-            if (user) {
-                // 登录用户：检查个人配置
-                const status = await this.checkConfigStatus();
-                if (!status.ok) {
-                    this.hideLoading();
-                    if (status.reason === 'auth_required') {
-                        this.showError('请先登录再使用此功能。');
-                        return;
-                    }
-                    if (status.reason === 'user_config_missing') {
-                        this.showError('请先在"配置"里保存你的飞书 AppID/Secret/TableId。');
-                        return;
-                    }
-                    if (status.reason === 'enc_key_mismatch') {
-                        this.showError('配置加密密钥已变更，请重新保存配置。');
-                        return;
-                    }
-                    this.showError(`无法开始提取：${status.reason}`);
-                    return;
-                }
-                console.log('用户配置检查通过，使用个人配置');
-            } else {
-                // 未登录用户：使用环境变量配置
-                console.log('用户未登录，使用环境变量配置');
-            }
+            // 读取本地配置（如无则后端会仅返回提取结果并跳过写入）
+            const feishuConfig = this.getFeishuConfig();
 
-            // 2) 再真正调用 /api/extract
+            // 调用提取接口（统一普通 fetch，配置通过 body 传递）
             const apiEndpoint = this.getApiEndpoint();
             console.log('使用API端点:', apiEndpoint);
-            
-            if (user) {
-                // 登录用户：使用带身份验证的fetch
-                console.log('使用身份验证fetch');
-                const data = await this.authedFetch(apiEndpoint, {
-                    method: 'POST',
-                    body: JSON.stringify({ url })
-                });
-                
-                // 处理成功结果
+
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, feishuConfig })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.ok) {
                 const websiteInfo = data.results;
-                websiteInfo.url = data.url; // 添加URL到结果中
+                websiteInfo.url = data.url;
                 
                 this.displayResults(websiteInfo);
                 this.hideLoading();
                 
-                // 显示飞书状态
                 if (data.feishuStatus === 'success' || data.feishuSuccess) {
                     this.showFeishuSuccess();
                 } else if (data.feishuStatus === 'skipped') {
@@ -206,38 +194,7 @@ class WebsiteExtractor {
                     this.showFeishuError();
                 }
             } else {
-                // 未登录用户：使用普通fetch
-                console.log('使用普通fetch');
-                const response = await fetch(apiEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ url })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                if (data.ok) {
-                    const websiteInfo = data.results;
-                    websiteInfo.url = data.url;
-                    
-                    this.displayResults(websiteInfo);
-                    this.hideLoading();
-                    
-                    if (data.feishuStatus === 'success' || data.feishuSuccess) {
-                        this.showFeishuSuccess();
-                    } else if (data.feishuStatus === 'skipped') {
-                        this.showFeishuInfo(data.feishuMessage || '未配置飞书，已跳过写入');
-                    } else {
-                        this.showFeishuError();
-                    }
-                } else {
-                    throw new Error(data.message || data.error || '提取失败');
-                }
+                throw new Error(data.message || data.error || '提取失败');
             }
         } catch (e) {
             console.error('提取失败:', e);
@@ -390,8 +347,7 @@ class WebsiteExtractor {
         // 初始化登录状态
         this.updateLoginStatus();
         
-        // 检查配置状态
-        this.checkConfigStatus();
+        // 本地优先模式：不再强制检查服务器侧的个人配置
     }
 
     // 更新登录状态显示
