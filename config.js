@@ -89,15 +89,32 @@ class ConfigManager {
             // 发送配置到服务器（使用新的API端点）
             try {
                 // 检查用户是否登录
-                if (typeof netlifyIdentity !== 'undefined' && netlifyIdentity.currentUser()) {
-                    // 使用新的字段名和API端点
+                if (typeof netlifyIdentity === 'undefined') {
+                    this.showStatus('需要加载 Netlify Identity 组件。请刷新后重试。', 'error');
+                    return;
+                }
+
+                let user = netlifyIdentity.currentUser();
+                if (!user) {
+                    // 未登录 -> 弹出登录框
+                    netlifyIdentity.open('login');
+                    await new Promise(resolve => {
+                        const onLogin = () => { netlifyIdentity.off('login', onLogin); resolve(); };
+                        netlifyIdentity.on('login', onLogin);
+                    });
+                    user = netlifyIdentity.currentUser();
+                }
+
+                if (user) {
+                    // 发送到函数：包含 tableId 和（若可解析到）bitableAppToken
                     const apiData = {
                         appId: formData.appId,
                         appSecret: formData.appSecret,
-                        tableId: this.extractTableIdFromUrl(formData.bitableUrl)
+                        tableId: this.extractTableIdFromUrl(formData.bitableUrl),
+                        bitableAppToken: this.extractAppTokenFromUrl(formData.bitableUrl)
                     };
-                    
-                    const token = await netlifyIdentity.currentUser().jwt();
+
+                    const token = await user.jwt();
                     const response = await fetch('/.netlify/functions/config-save', {
                         method: 'POST',
                         headers: {
@@ -106,16 +123,14 @@ class ConfigManager {
                         },
                         body: JSON.stringify(apiData)
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (result.ok) {
                         this.showStatus('配置保存成功！个人配置已更新', 'success');
                     } else {
                         this.showStatus('本地配置已保存，但个人配置更新失败: ' + result.error, 'error');
                     }
-                } else {
-                    this.showStatus('本地配置已保存，但需要登录才能保存个人配置', 'warning');
                 }
             } catch (serverError) {
                 console.error('服务器配置更新失败:', serverError);
@@ -131,6 +146,18 @@ class ConfigManager {
             console.error('保存配置失败:', error);
             this.showStatus('保存配置失败: ' + error.message, 'error');
         }
+    }
+
+    // 从多维表格 URL 中解析 appToken（Wiki 节点 token 或 Base token），若无法解析返回 undefined
+    extractAppTokenFromUrl(url) {
+        try {
+            // 常见格式：/wiki/<nodeToken>?table=tbl... 或 /base/<appToken>/.../tbl...
+            const m1 = url.match(/\/wiki\/([A-Za-z0-9]+)/);
+            if (m1 && m1[1]) return m1[1];
+            const m2 = url.match(/\/base\/([A-Za-z0-9]+)/);
+            if (m2 && m2[1]) return m2[1];
+        } catch (_) {}
+        return undefined;
     }
     
     // 加载配置

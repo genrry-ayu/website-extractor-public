@@ -255,8 +255,21 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const body = JSON.parse(event.body || "{}");
-    const { url } = body;
+    // 安全解析 body，且允许 GET 通过 query 传参
+    let body = {};
+    if (event.httpMethod === 'POST' || event.httpMethod === 'PUT' || event.httpMethod === 'PATCH') {
+      try {
+        body = event.body ? JSON.parse(event.body) : {};
+      } catch (parseErr) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ ok: false, error: 'invalid_body', message: 'Request body must be valid JSON' })
+        };
+      }
+    }
+    const qsUrl = event.queryStringParameters && (event.queryStringParameters.url || event.queryStringParameters.u);
+    const { url } = body.url ? body : { url: qsUrl };
 
     if (!url) {
       return {
