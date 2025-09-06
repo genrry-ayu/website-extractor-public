@@ -12,6 +12,94 @@ const ENC_KEY = crypto.createHash('sha256')
 const pick = (v) => (typeof v === 'string' && v.trim()) ? v.trim() : undefined;
 const mask = (s) => s ? s.slice(0,3) + '***' + s.slice(-2) : '';
 
+// 电话号码格式化函数
+function formatPhoneNumber(phone, url) {
+  if (!phone) return '';
+  
+  // 清理电话号码
+  let cleanPhone = phone.replace(/[^\d+]/g, '');
+  
+  // 根据URL域名判断国家
+  let country = '';
+  if (url.includes('.ie')) country = 'IE';
+  else if (url.includes('.us') || url.includes('.com')) country = 'US';
+  else if (url.includes('.uk') || url.includes('.co.uk')) country = 'UK';
+  else if (url.includes('.au') || url.includes('.com.au')) country = 'AU';
+  else if (url.includes('.ca')) country = 'CA';
+  
+  // 根据国家格式化
+  switch (country) {
+    case 'IE': // 爱尔兰
+      if (cleanPhone.startsWith('353')) {
+        return '+353 ' + cleanPhone.substring(3).replace(/(\d{2,3})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
+      } else if (cleanPhone.startsWith('0')) {
+        return '+353 ' + cleanPhone.substring(1).replace(/(\d{2,3})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
+      } else if (cleanPhone.length >= 9) {
+        return '+353 ' + cleanPhone.replace(/(\d{2,3})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
+      }
+      break;
+      
+    case 'US':
+    case 'CA': // 美国/加拿大
+      if (cleanPhone.startsWith('1') && cleanPhone.length === 11) {
+        return '+1 ' + cleanPhone.substring(1).replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+      } else if (cleanPhone.length === 10) {
+        return '+1 ' + cleanPhone.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+      }
+      break;
+      
+    case 'UK': // 英国
+      if (cleanPhone.startsWith('44')) {
+        return '+44 ' + cleanPhone.substring(2).replace(/(\d{2,4})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
+      } else if (cleanPhone.startsWith('0')) {
+        return '+44 ' + cleanPhone.substring(1).replace(/(\d{2,4})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
+      }
+      break;
+      
+    case 'AU': // 澳大利亚
+      if (cleanPhone.startsWith('61')) {
+        return '+61 ' + cleanPhone.substring(2).replace(/(\d{1})(\d{4})(\d{4})/, '$1 $2 $3');
+      } else if (cleanPhone.startsWith('0')) {
+        return '+61 ' + cleanPhone.substring(1).replace(/(\d{1})(\d{4})(\d{4})/, '$1 $2 $3');
+      }
+      break;
+  }
+  
+  // 通用格式化
+  if (cleanPhone.startsWith('+')) {
+    return cleanPhone.replace(/(\+\d{1,3})(\d{2,4})(\d{2,4})(\d{2,4})/, '$1 $2 $3 $4');
+  } else if (cleanPhone.length >= 7) {
+    return '+' + cleanPhone.replace(/(\d{1,3})(\d{2,4})(\d{2,4})(\d{2,4})/, '$1 $2 $3 $4');
+  }
+  
+  return phone; // 返回原始格式
+}
+
+// 地址格式化函数
+function formatAddress(address, url) {
+  if (!address) return '';
+  
+  let country = '';
+  if (url.includes('.ie')) country = 'Ireland';
+  else if (url.includes('.us') || url.includes('.com')) country = 'United States';
+  else if (url.includes('.uk') || url.includes('.co.uk')) country = 'United Kingdom';
+  else if (url.includes('.au') || url.includes('.com.au')) country = 'Australia';
+  else if (url.includes('.ca')) country = 'Canada';
+  
+  // 清理地址
+  let cleanAddress = address
+    .replace(/\s+/g, ' ')
+    .replace(/[,\s]+$/, '') // 移除末尾的逗号和空格
+    .trim();
+  
+  // 如果地址中没有国家信息，且通过域名确定了国家，则添加
+  if (country && !cleanAddress.toLowerCase().includes(country.toLowerCase())) {
+    cleanAddress += ', ' + country;
+  }
+  
+  return cleanAddress;
+}
+
 // 解密函数
 function decrypt(b64) {
   const raw = Buffer.from(b64, 'base64');
@@ -43,12 +131,12 @@ async function extractWebsiteInfo(url) {
   try {
     console.log('开始提取网站信息:', url);
     
-    const response = await axios.get(url, {
+        const response = await axios.get(url, {
       timeout: 10000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
 
     const $ = cheerio.load(response.data);
     
@@ -109,16 +197,20 @@ async function extractWebsiteInfo(url) {
       }
     }
 
-    // 提取地址 - 增强选择器和模式匹配
+    // 提取地址 - 多国格式支持
     let address = '';
     const addressSelectors = [
       '.address',
       '.location',
       '.contact-address',
       '.business-address',
+      '.store-address',
+      '.office-address',
       '[class*="address"]',
       '[class*="location"]',
-      '[class*="contact"]'
+      '[class*="contact"]',
+      '[class*="store"]',
+      '[class*="office"]'
     ];
     
     for (const selector of addressSelectors) {
@@ -126,7 +218,7 @@ async function extractWebsiteInfo(url) {
       if (element.length) {
         let text = element.text().trim();
         // 验证是否为有效地址（包含数字、街道关键词等）
-        if (text && (/\d/.test(text) || /street|road|avenue|lane|drive|way|centre|center/i.test(text))) {
+        if (text && (/\d/.test(text) || /street|road|avenue|lane|drive|way|centre|center|boulevard|place|square|terrace|close|court|gardens|park|view|heights|manor|house|building|unit|suite|floor|level/i.test(text))) {
           address = text.replace(/\s+/g, ' ').trim();
           break;
         }
@@ -135,12 +227,29 @@ async function extractWebsiteInfo(url) {
 
     // 如果没有找到结构化地址，尝试从页面文本中提取
     if (!address) {
-      const addressRegex = /(?:Address|Location|Contact)[:\s]*([^.\n]{20,200})/gi;
-      const addressMatch = response.data.match(addressRegex);
-      if (addressMatch) {
-        address = addressMatch[0].replace(/^(?:Address|Location|Contact)[:\s]*/i, '').trim();
+      // 多国地址模式
+      const addressPatterns = [
+        // 爱尔兰地址模式
+        /(?:Address|Location|Contact|Find us)[:\s]*([^.\n]{20,200}(?:Ireland|Dublin|Cork|Limerick|Galway|Waterford)[^.\n]{0,50})/gi,
+        // 美国地址模式
+        /(?:Address|Location|Contact|Find us)[:\s]*([^.\n]{20,200}(?:USA|United States|CA|NY|TX|FL|IL|PA|OH|GA|NC|MI|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|SC|AL|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|WV|ID|HI|NH|ME|RI|MT|DE|SD|ND|AK|VT|WY)[^.\n]{0,50})/gi,
+        // 英国地址模式
+        /(?:Address|Location|Contact|Find us)[:\s]*([^.\n]{20,200}(?:UK|United Kingdom|England|Scotland|Wales|Northern Ireland|London|Manchester|Birmingham|Liverpool|Leeds|Sheffield|Bristol|Nottingham|Leicester|Coventry|Bradford|Cardiff|Belfast|Newcastle|Stoke|Southampton|Derby|Portsmouth|Brighton|Plymouth|Northampton|Reading|Luton|Wolverhampton)[^.\n]{0,50})/gi,
+        // 通用地址模式
+        /(?:Address|Location|Contact|Find us)[:\s]*([^.\n]{20,200})/gi
+      ];
+      
+      for (const pattern of addressPatterns) {
+        const addressMatch = response.data.match(pattern);
+        if (addressMatch) {
+          address = addressMatch[0].replace(/^(?:Address|Location|Contact|Find us)[:\s]*/i, '').trim();
+          break;
+        }
       }
     }
+    
+    // 格式化地址
+    address = formatAddress(address, url);
 
     // 提取邮箱 - 优化正则表达式和优先级
     let email = '';
@@ -154,30 +263,50 @@ async function extractWebsiteInfo(url) {
       email = preferredEmails.length > 0 ? preferredEmails[0] : emailMatches[0];
     }
 
-    // 提取电话 - 优化正则表达式和格式清理
+    // 提取电话 - 多国格式支持
     let phone = '';
-    const phoneRegex = /(?:\+?353\s*)?(?:\(0\)\s*)?(?:0\s*)?[1-9]\d{1,3}\s*\d{3,4}\s*\d{3,4}/g;
-    const phoneMatches = response.data.match(phoneRegex);
+    
+    // 多国电话号码正则表达式
+    const phonePatterns = [
+      // 爱尔兰格式: +353 XX XXX XXXX 或 +353 X XXX XXXX
+      /(?:\+353\s*)?(?:\(0\)\s*)?(?:0\s*)?[1-9]\d{1,3}\s*\d{3,4}\s*\d{3,4}/g,
+      // 美国/加拿大格式: +1 NXX-NXX-XXXX
+      /(?:\+1\s*)?(?:\(?([2-9]\d{2})\)?[-.\s]?)?([2-9]\d{2})[-.\s]?(\d{4})/g,
+      // 英国格式: +44 XXXX XXX XXX
+      /(?:\+44\s*)?(?:\(0\)\s*)?(?:0\s*)?[1-9]\d{2,3}\s*\d{3,4}\s*\d{3,4}/g,
+      // 澳大利亚格式: +61 X XXXX XXXX
+      /(?:\+61\s*)?(?:\(0\)\s*)?(?:0\s*)?[2-9]\d{1}\s*\d{4}\s*\d{4}/g,
+      // 通用国际格式: +XX XXXX XXXX
+      /\+?[1-9]\d{1,3}\s*\d{2,4}\s*\d{2,4}\s*\d{2,4}/g,
+      // 本地格式（7-15位数字）
+      /(?:\(?\+?[1-9]\d{0,3}\)?[-.\s]?)?(?:\(?\d{1,4}\)?[-.\s]?)?\d{2,4}[-.\s]?\d{2,4}[-.\s]?\d{2,4}/g
+    ];
+    
+    let phoneMatches = [];
+    for (const pattern of phonePatterns) {
+      const matches = response.data.match(pattern);
+      if (matches && matches.length > 0) {
+        phoneMatches = matches;
+        break;
+      }
+    }
+    
     if (phoneMatches && phoneMatches.length > 0) {
-      // 清理和格式化电话号码
       phone = phoneMatches[0]
         .replace(/\s+/g, ' ')
         .replace(/\(0\)/g, '')
+        .replace(/[^\d+\s\-\(\)]/g, '') // 只保留数字、+、空格、-、()
         .trim();
       
-      // 如果是爱尔兰号码，确保格式正确
-      if (phone.startsWith('0') && !phone.startsWith('+353')) {
-        phone = '+353 ' + phone.substring(1);
-      } else if (!phone.startsWith('+')) {
-        phone = '+353 ' + phone;
-      }
+      // 根据国家格式化电话号码
+      phone = formatPhoneNumber(phone, url);
     }
 
     // 提取社交媒体链接 - 优化选择器和URL处理
     const socialLinks = {
-      instagram: [],
-      facebook: []
-    };
+            instagram: [],
+            facebook: []
+        };
 
     // 优先从header、footer、导航等区域查找
     const prioritySelectors = [
@@ -192,8 +321,8 @@ async function extractWebsiteInfo(url) {
       if (container.length) {
         const links = container.find('a[href*="instagram.com"], a[href*="facebook.com"]');
         links.each((i, el) => {
-          const href = $(el).attr('href');
-          if (href) {
+            const href = $(el).attr('href');
+            if (href) {
             let cleanUrl = href;
             // 清理URL
             if (href.includes('instagram.com')) {
@@ -218,8 +347,8 @@ async function extractWebsiteInfo(url) {
     if (socialLinks.instagram.length === 0 && socialLinks.facebook.length === 0) {
       const allLinks = $('a[href*="instagram.com"], a[href*="facebook.com"]');
       allLinks.each((i, el) => {
-        const href = $(el).attr('href');
-        if (href) {
+            const href = $(el).attr('href');
+            if (href) {
           let cleanUrl = href;
           if (href.includes('instagram.com')) {
             cleanUrl = href.replace(/\/$/, '');
@@ -591,14 +720,14 @@ exports.handler = async (event, context) => {
     };
 
     console.log("extract end", { requestId, written: feishuSuccess ? 1 : 0, configStatus });
-    
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
+
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
         ok: true,
         requestId,
-        url: url,
+                url: url,
         results: websiteInfo,
         feishuSuccess: feishuSuccess,
         feishuStatus,
@@ -610,15 +739,15 @@ exports.handler = async (event, context) => {
   } catch (e) {
     console.error("extract error", { requestId, err: String(e) });
     // 显式返回 JSON，避免前端收到 HTML 误判为 JSON
-    return { 
-      statusCode: 500, 
-      headers,
-      body: JSON.stringify({ 
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({
         ok: false, 
         error: "internal_error", 
         message: "服务器内部错误",
         requestId 
-      }) 
-    };
-  }
+            })
+        };
+    }
 };
