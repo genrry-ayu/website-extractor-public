@@ -160,31 +160,21 @@ class ConfigManager {
             return;
         }
         try {
-            if (pvStatus) { pvStatus.className = 'status-message status-info'; pvStatus.textContent = '正在获取访问令牌...'; }
-            const tkResp = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ app_id: appId, app_secret: appSecret })
+            if (pvStatus) { pvStatus.className = 'status-message status-info'; pvStatus.textContent = '正在通过服务端校验...'; }
+            const resp = await fetch('/.netlify/functions/validate-feishu', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ appId, appSecret, appToken })
             });
-            const tkData = await tkResp.json();
-            if (tkData.code !== 0 || !tkData.tenant_access_token) {
-                throw new Error('获取访问令牌失败: ' + (tkData.msg || 'unknown'));
+            const data = await resp.json();
+            if (!data.ok) {
+                throw new Error(data.error || '验证失败');
             }
-            if (pvStatus) { pvStatus.textContent = '访问令牌获取成功，校验 App Token...'; }
-            // 校验 appToken（如果解析到了）
-            let tokenToCheck = appToken;
-            if (!tokenToCheck) {
-                // 无 appToken 也允许，只做 tableId 结构校验
-                if (pvStatus) { pvStatus.className = 'status-message status-success'; pvStatus.textContent = '已验证：AppID/Secret 有效，Table ID 格式正确'; }
-                return;
-            }
-            const appResp = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${tokenToCheck}`, {
-                headers: { 'Authorization': `Bearer ${tkData.tenant_access_token}` }
-            });
-            const appJson = await appResp.json();
-            if (appJson.code === 0) {
-                if (pvStatus) { pvStatus.className = 'status-message status-success'; pvStatus.textContent = '验证成功：App Token 有效，Table ID 格式正确'; }
+            const okToken = data.appCheck?.code === 0 || !appToken;
+            if (okToken) {
+                if (pvStatus) { pvStatus.className = 'status-message status-success'; pvStatus.textContent = '验证成功：AppID/Secret 有效，App Token 可用（或未提供）'; }
             } else {
-                if (pvStatus) { pvStatus.className = 'status-message status-error'; pvStatus.textContent = `验证失败：App Token 无效（${appJson.msg || appJson.code}）`; }
+                if (pvStatus) { pvStatus.className = 'status-message status-error'; pvStatus.textContent = '验证失败：App Token 无效'; }
             }
         } catch (e) {
             console.error('预览验证失败:', e);
@@ -362,38 +352,30 @@ class ConfigManager {
             }
             
             this.showStatus('正在测试飞书连接...', 'info');
-            
-            // 转换字段名称以匹配API期望的格式
-            const extractedTableId = this.extractTableIdFromUrl(formData.bitableUrl);
-            const apiData = {
-                feishuAppId: formData.appId,
-                feishuAppSecret: formData.appSecret,
-                feishuTableId: extractedTableId
-            };
-            
-            console.log('测试连接配置:', {
-                appId: apiData.feishuAppId,
-                appSecret: apiData.feishuAppSecret.substring(0, 10) + '...',
-                tableId: apiData.feishuTableId,
-                originalUrl: formData.bitableUrl
+            const tableId = this.extractTableIdFromUrl(formData.bitableUrl);
+            const appToken = this.extractAppTokenFromUrl(formData.bitableUrl);
+
+            // 1) 服务端校验
+            const vResp = await fetch('/.netlify/functions/validate-feishu', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ appId: formData.appId, appSecret: formData.appSecret, appToken })
             });
-            
-            const response = await fetch('/api/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(apiData)
+            const vData = await vResp.json();
+            if (!vData.ok) {
+                this.showStatus('❌ 连接测试失败: ' + (vData.error || '验证失败'), 'error');
+                return;
+            }
+
+            // 2) 写入“成功”到“来自 gpt 的输出”（或其候选列）
+            const pResp = await fetch('/.netlify/functions/feishu-ping', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ appId: formData.appId, appSecret: formData.appSecret, tableId, appToken, message: '成功' })
             });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                this.showStatus('✅ 连接测试成功！飞书API配置正确', 'success');
-                console.log('连接测试成功:', result.message);
+            const pData = await pResp.json();
+            if (pData.ok) {
+                this.showStatus(`✅ 连接成功，并写入测试记录到「${pData.fieldName || '来自 gpt 的输出'}」`, 'success');
             } else {
-                this.showStatus('❌ 连接测试失败: ' + result.error, 'error');
-                console.error('连接测试失败:', result.error);
+                this.showStatus('连接成功，但写入测试记录失败: ' + (pData.error || 'write_failed'), 'warning');
             }
             
         } catch (error) {

@@ -195,23 +195,74 @@ async function writeToFeishu(data, cfg) {
       throw new Error('表格ID格式不正确，请检查多维表格链接。表格ID应该以tbl开头');
     }
 
-    // 写入多维表格
-    const recordData = {
-      fields: {
-        '网站URL': data.url || '',
-        '公司名称': data.companyName || '',
-        '描述': data.description || '',
-        '地址': data.address || '',
-        '邮箱': data.email || '',
-        '电话': data.phone || '',
-        'Instagram': data.instagram?.join(', ') || '',
-        'Facebook': data.facebook?.join(', ') || '',
-        '提取时间': new Date().toISOString()
+    // 查询表格字段，做动态字段映射，避免因列名不一致写入失败
+    let fieldNames = [];
+    try {
+      const appTokenPreview = cfg.bitableAppToken || cfg.appId;
+      const fieldsResp = await axios.get(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${appTokenPreview}/tables/${tableId}/fields`,
+        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+      );
+      if (fieldsResp.data?.code === 0) {
+        fieldNames = (fieldsResp.data.data?.items || []).map(it => it.field_name);
       }
-    };
+    } catch (e) {
+      console.warn('获取表格字段失败（不影响写入，将尝试通用列名）:', e.response?.data || e.message);
+    }
 
-    console.log('准备写入数据:', recordData);
-    console.log('目标表格ID:', tableId);
+    const have = new Set(fieldNames);
+    const pickName = (...cands) => cands.find(n => have.has(n));
+
+    const mapUrl        = pickName('网站URL','官网地址','网站地址','链接','URL');
+    const mapName       = pickName('公司名称','公司名','品牌','名称','店铺名称');
+    const mapDesc       = pickName('描述','简介','公司简介');
+    const mapAddr       = pickName('地址','公司地址','联系地址','所在地');
+    const mapEmail      = pickName('邮箱','Email','电子邮箱');
+    const mapPhone      = pickName('电话','Phone','联系电话');
+    const mapInstagram  = pickName('Instagram','ins');
+    const mapFacebook   = pickName('Facebook','facebook');
+    const mapTime       = pickName('提取时间','时间','created_at');
+    const mapRaw        = pickName('来自 gpt 的输出','原始数据','raw');
+
+    const fieldsToWrite = {};
+    if (mapUrl)       fieldsToWrite[mapUrl] = data.url || '';
+    if (mapName)      fieldsToWrite[mapName] = data.companyName || '';
+    if (mapDesc)      fieldsToWrite[mapDesc] = data.description || '';
+    if (mapAddr)      fieldsToWrite[mapAddr] = data.address || '';
+    if (mapEmail)     fieldsToWrite[mapEmail] = data.email || '';
+    if (mapPhone)     fieldsToWrite[mapPhone] = data.phone || '';
+    if (mapInstagram) fieldsToWrite[mapInstagram] = data.instagram?.join(', ') || '';
+    if (mapFacebook)  fieldsToWrite[mapFacebook] = data.facebook?.join(', ') || '';
+    if (mapTime)      fieldsToWrite[mapTime] = new Date().toISOString();
+    if (mapRaw)       fieldsToWrite[mapRaw] = JSON.stringify({
+      url: data.url,
+      companyName: data.companyName,
+      description: data.description,
+      address: data.address,
+      email: data.email,
+      phone: data.phone,
+      instagram: data.instagram,
+      facebook: data.facebook,
+      extractedAt: new Date().toISOString()
+    });
+
+    // 如果没有获取到字段列表或完全匹配不到，则回退到默认字段集（可能失败，但至少尝试）
+    if (Object.keys(fieldsToWrite).length === 0) {
+      fieldsToWrite['网站URL']   = data.url || '';
+      fieldsToWrite['公司名称']   = data.companyName || '';
+      fieldsToWrite['描述']     = data.description || '';
+      fieldsToWrite['地址']     = data.address || '';
+      fieldsToWrite['邮箱']     = data.email || '';
+      fieldsToWrite['电话']     = data.phone || '';
+      fieldsToWrite['Instagram'] = data.instagram?.join(', ') || '';
+      fieldsToWrite['Facebook']  = data.facebook?.join(', ') || '';
+      fieldsToWrite['提取时间']   = new Date().toISOString();
+    }
+
+    const recordData = { fields: fieldsToWrite };
+
+    console.log('目标表格字段:', fieldNames);
+    console.log('实际写入字段映射:', Object.keys(fieldsToWrite));
 
     // 解析 appToken：如果传入的是 Wiki 节点 token，则解析为真实的多维表格 App Token
     async function resolveAppToken(maybeToken) {
@@ -245,7 +296,14 @@ async function writeToFeishu(data, cfg) {
           }
         }
       );
-      console.log('写入成功:', writeResponse.status, writeResponse.data);
+      const result = writeResponse?.data || {};
+      // Feishu API 返回 200 即可能失败，需检查 result.code === 0
+      if (result.code !== 0) {
+        const msg = result.msg || 'unknown_error';
+        console.error('飞书写入返回失败:', msg, result);
+        throw new Error(`feishu_write_failed: ${msg}`);
+      }
+      console.log('写入成功，record_id:', result.data?.record?.record_id || result.data?.record_id);
     } catch (writeError) {
       console.error('写入失败:', writeError.response?.data || writeError.message);
       console.error('错误状态码:', writeError.response?.status);
@@ -253,7 +311,8 @@ async function writeToFeishu(data, cfg) {
       throw writeError;
     }
 
-    return writeResponse.status === 200;
+    // 仅在 result.code === 0 时视为成功
+    return true;
   } catch (error) {
     console.error('飞书API错误:', error.response?.data || error.message);
     throw error;
