@@ -21,7 +21,8 @@ function formatPhoneNumber(phone, url) {
   
   // 根据URL域名判断国家
   let country = '';
-  if (url.includes('.ie')) country = 'IE';
+  if (url.includes('.no')) country = 'NO';
+  else if (url.includes('.ie')) country = 'IE';
   else if (url.includes('.us') || url.includes('.com')) country = 'US';
   else if (url.includes('.uk') || url.includes('.co.uk')) country = 'UK';
   else if (url.includes('.au') || url.includes('.com.au')) country = 'AU';
@@ -29,6 +30,13 @@ function formatPhoneNumber(phone, url) {
   
   // 根据国家格式化
   switch (country) {
+    case 'NO': // 挪威 8位本地号，国际 +47 XX XX XX XX
+      if (cleanPhone.startsWith('47') && cleanPhone.length === 10) {
+        return '+47 ' + cleanPhone.substring(2).replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4');
+      } else if (cleanPhone.length === 8) {
+        return '+47 ' + cleanPhone.replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4');
+      }
+      break;
     case 'IE': // 爱尔兰
       if (cleanPhone.startsWith('353')) {
         return '+353 ' + cleanPhone.substring(3).replace(/(\d{2,3})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
@@ -80,7 +88,8 @@ function formatAddress(address, url) {
   if (!address) return '';
   
   let country = '';
-  if (url.includes('.ie')) country = 'Ireland';
+  if (url.includes('.no')) country = 'Norway';
+  else if (url.includes('.ie')) country = 'Ireland';
   else if (url.includes('.us') || url.includes('.com')) country = 'United States';
   else if (url.includes('.uk') || url.includes('.co.uk')) country = 'United Kingdom';
   else if (url.includes('.au') || url.includes('.com.au')) country = 'Australia';
@@ -227,7 +236,20 @@ async function extractWebsiteInfo(url) {
 
     // 如果没有找到结构化地址，尝试从页面文本中提取
     if (!address) {
-      // 多国地址模式
+      const pageText = $('body').text() || '';
+      // 优先在页脚/联系模块搜集关键词
+      const keywordSelectors = ['footer','.footer','.site-footer','.contact','.contact-info','#contact'];
+      for (const sel of keywordSelectors) {
+        const el = $(sel).first();
+        if (el && el.text()) {
+          const txt = el.text().replace(/\s+/g,' ').trim();
+          if (/address|adresse|location|kontakt|contact|find us|visit/i.test(txt) && txt.length > 10) {
+            address = txt; break;
+          }
+        }
+      }
+
+      // 多国地址模式（包含邮编）
       const addressPatterns = [
         // 爱尔兰地址模式
         /(?:Address|Location|Contact|Find us)[:\s]*([^.\n]{20,200}(?:Ireland|Dublin|Cork|Limerick|Galway|Waterford)[^.\n]{0,50})/gi,
@@ -240,11 +262,18 @@ async function extractWebsiteInfo(url) {
       ];
       
       for (const pattern of addressPatterns) {
-        const addressMatch = response.data.match(pattern);
+        const addressMatch = pageText.match(pattern);
         if (addressMatch) {
           address = addressMatch[0].replace(/^(?:Address|Location|Contact|Find us)[:\s]*/i, '').trim();
           break;
         }
+      }
+
+      // 挪威邮编兜底：查找包含4位邮编的行
+      if (!address && url.includes('.no')) {
+        const noPostal = /(\d{4})/g;
+        const m = pageText.match(new RegExp(`([A-Za-zÀ-ÿ0-9,.\n\r\- ]{6,120}?${noPostal.source}[ A-Za-zÀ-ÿ0-9,.\-]{0,80})`,'i'));
+        if (m) address = m[1].replace(/\s+/g,' ').trim();
       }
     }
     

@@ -102,33 +102,62 @@ class SidebarContentExtractor {
         return '';
     }
 
-    extractAddress() {
-        // 查找地址相关的文本
-        const addressKeywords = ['地址', 'address', 'location', '位置', 'contact', '联系'];
-        const addressSelectors = [
-            '.address', '.location', '.contact-info', '.footer',
-            '[class*="address"]', '[class*="location"]', '[class*="contact"]'
-        ];
+    // —— 国家检测 / JSON‑LD 解析 / 地址提取 ——
+    detectCountryCode() {
+        const host = location.hostname || '';
+        const tld = host.split('.').pop();
+        const map = { no:'NO', dk:'DK', se:'SE', fi:'FI', de:'DE', fr:'FR', nl:'NL', es:'ES', it:'IT', pt:'PT', pl:'PL', uk:'GB', gb:'GB', ie:'IE', ch:'CH', at:'AT', be:'BE', us:'US', ca:'CA', au:'AU', nz:'NZ' };
+        const og = document.querySelector('meta[property="og:locale"]')?.content;
+        if (og && og.includes('_')) return og.split('_')[1].toUpperCase();
+        return map[tld] || 'US';
+    }
 
-        // 从特定区域查找
-        for (const selector of addressSelectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-                const text = element.textContent?.trim();
-                if (text && this.containsAddressKeywords(text)) {
-                    return this.cleanAddress(text);
-                }
+    parseJsonLd() {
+        let addr = null, phone = null, country = null;
+        const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+        const visit = (node) => {
+            if (!node || typeof node !== 'object') return;
+            const a = node.address;
+            if (a) {
+                const street = a.streetAddress || a.street || '';
+                const city = a.addressLocality || a.city || '';
+                const region = a.addressRegion || '';
+                const postal = a.postalCode || '';
+                const c = a.addressCountry || a.country || '';
+                const parts = [street, postal, city, region, c].filter(Boolean).join(', ');
+                if (parts && (!addr || parts.length > addr.length)) addr = parts;
+                if (c) country = c;
+            }
+            if (!phone && node.telephone) phone = String(node.telephone);
+            Object.values(node).forEach(visit);
+        };
+        scripts.forEach(s => { try { visit(JSON.parse(s.textContent || '{}')); } catch(_){} });
+        return { addr, phone, country };
+    }
+
+    extractAddress() {
+        const jsonld = this.parseJsonLd();
+        if (jsonld.addr) return this.cleanAddress(jsonld.addr);
+
+        const selectors = ['[itemprop="address"]','address','.address', '.location', '.contact-address','.business-address','.store-address','.office-address','[class*="address"]','[class*="location"]','[class*="contact"]'];
+        for (const sel of selectors) {
+            const el = document.querySelector(sel);
+            if (el) {
+                const txt = (el.textContent || '').replace(/\s+/g,' ').trim();
+                if (txt && this.containsAddressKeywords(txt)) return this.cleanAddress(txt);
             }
         }
 
-        // 从页面文本中查找地址模式
-        const addressPattern = /([A-Za-zæøåÆØÅ\s]+\.?\s*\d+[A-Za-zæøåÆØÅ\s]*,\s*\d{4}\s*[A-Za-zæøåÆØÅ\s]+)/;
-        const bodyText = document.body.textContent;
-        const match = bodyText.match(addressPattern);
-        if (match) {
-            return match[1].trim();
+        const cc = this.detectCountryCode();
+        const body = (document.body.textContent || '').replace(/\s+/g,' ');
+        const postal = {
+            NO: /\b\d{4}\b/, DK:/\b\d{4}\b/, SE:/\b\d{3}\s?\d{2}\b/, FI:/\b\d{5}\b/, DE:/\b\d{5}\b/, FR:/\b\d{5}\b/, NL:/\b\d{4}\s?[A-Z]{2}\b/, ES:/\b\d{5}\b/, IT:/\b\d{5}\b/, PT:/\b\d{4}-\d{3}\b/, PL:/\b\d{2}-\d{3}\b/, GB:/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[ABD-HJLNP-UW-Z]{2})\b/i, US:/\b\d{5}(?:-\d{4})?\b/, CA:/\b[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z]\s?\d[ABCEGHJ-NPRSTV-Z]\d\b/i, AU:/\b\d{4}\b/, NZ:/\b\d{4}\b/ };
+        const re = postal[cc];
+        if (re) {
+            const m = body.match(new RegExp(`([A-Za-zÀ-ÿ0-9,./\\-]{6,120}?\
+${re.source}\s?[A-Za-zÀ-ÿ0-9,./\\-]{0,80})`,'i'));
+            if (m) return this.cleanAddress(m[1]);
         }
-
         return '';
     }
 
@@ -152,32 +181,60 @@ class SidebarContentExtractor {
     }
 
     extractPhone() {
-        // 查找电话号码
-        const phonePatterns = [
-            /(\+47\s*\d{2}\s*\d{2}\s*\d{2}\s*\d{2})/g, // 挪威国际格式
-            /(\d{2}\s*\d{2}\s*\d{2}\s*\d{2})/g, // 挪威本地格式
-            /(\+\d{1,3}\s*\d{1,4}\s*\d{1,4}\s*\d{1,4})/g, // 国际格式
-            /(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/g // 美国格式
+        const cc = this.detectCountryCode();
+        // 1) tel: 链接
+        const tel = document.querySelector('a[href^="tel:"]')?.getAttribute('href');
+        if (tel) return this.formatPhone(tel.replace(/^tel:\s*/i,''), cc);
+
+        const body = document.body.textContent || '';
+        // 2) 多国常见格式
+        const patterns = [
+            /\+47\s*\d{2}\s*\d{2}\s*\d{2}\s*\d{2}/g,            // NO
+            /\+44\s*\d{2,4}\s*\d{3,4}\s*\d{3,4}/g,                // UK
+            /\+353\s*\d{1,3}\s*\d{3,4}\s*\d{3,4}/g,               // IE
+            /\+1\s*\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/g,               // US/CA
+            /\+61\s*\d\s*\d{4}\s*\d{4}/g,                         // AU
+            /\+\d{1,3}\s*\d{2,4}\s*\d{2,4}\s*\d{2,4}/g            // general
         ];
-
-        const bodyText = document.body.textContent;
-        
-        for (const pattern of phonePatterns) {
-            const matches = bodyText.match(pattern);
-            if (matches && matches.length > 0) {
-                // 过滤掉明显的无效号码
-                const validPhones = matches.filter(phone => 
-                    !phone.includes('000') && 
-                    !phone.includes('999') &&
-                    phone.length > 7
-                );
-                if (validPhones.length > 0) {
-                    return validPhones[0].trim();
-                }
-            }
+        for (const re of patterns) {
+            const m = body.match(re);
+            if (m && m[0]) return this.formatPhone(m[0], cc);
         }
-
+        // 3) 简单数字兜底
+        const m2 = body.match(/\+?\d[\d\s\-]{6,16}\d/);
+        if (m2) return this.formatPhone(m2[0], cc);
+        // 4) JSON-LD
+        const j = this.parseJsonLd();
+        if (j.phone) return this.formatPhone(j.phone, cc);
         return '';
+    }
+
+    formatPhone(input, cc) {
+        let s = (input || '').replace(/[^\d+]/g,'');
+        if (!s) return '';
+        if (cc === 'NO') {
+            if (s.startsWith('47') && s.length === 10) return '+47 ' + s.slice(2).replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4');
+            if (s.length === 8) return '+47 ' + s.replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4');
+        }
+        if (cc === 'IE') {
+            if (s.startsWith('353')) return '+353 ' + s.slice(3).replace(/(\d{2,3})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
+            if (s.startsWith('0')) return '+353 ' + s.slice(1).replace(/(\d{2,3})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
+        }
+        if (cc === 'UK' || cc === 'GB') {
+            if (s.startsWith('44')) return '+44 ' + s.slice(2).replace(/(\d{2,4})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
+            if (s.startsWith('0')) return '+44 ' + s.slice(1).replace(/(\d{2,4})(\d{3,4})(\d{3,4})/, '$1 $2 $3');
+        }
+        if (cc === 'US' || cc === 'CA') {
+            if (s.startsWith('1') && s.length === 11) return '+1 ' + s.slice(1).replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+            if (s.length === 10) return '+1 ' + s.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+        }
+        if (cc === 'AU') {
+            if (s.startsWith('61')) return '+61 ' + s.slice(2).replace(/(\d{1})(\d{4})(\d{4})/, '$1 $2 $3');
+            if (s.startsWith('0')) return '+61 ' + s.slice(1).replace(/(\d{1})(\d{4})(\d{4})/, '$1 $2 $3');
+        }
+        // 通用
+        if (s.startsWith('+')) return s.replace(/(\+\d{1,3})(\d{2,4})(\d{2,4})(\d{2,4})/, '$1 $2 $3 $4');
+        return '+' + s;
     }
 
     extractInstagramLinks() {
