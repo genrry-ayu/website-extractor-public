@@ -163,6 +163,12 @@ class WebsiteExtractor {
         try {
             // 读取本地配置（如无则后端会仅返回提取结果并跳过写入）
             const feishuConfig = this.getFeishuConfig();
+            console.log('本地飞书配置存在性:', {
+                hasAppId: !!feishuConfig?.appId,
+                hasAppSecret: !!feishuConfig?.appSecret,
+                hasTableId: !!feishuConfig?.tableId,
+                hasBitableAppToken: !!feishuConfig?.bitableAppToken
+            });
 
             // 调用提取接口（统一普通 fetch，配置通过 body 传递）
             const apiEndpoint = this.getApiEndpoint();
@@ -186,6 +192,7 @@ class WebsiteExtractor {
                 this.displayResults(websiteInfo);
                 this.hideLoading();
                 
+                console.log('服务端配置状态:', data.configStatus);
                 if (data.feishuStatus === 'success' || data.feishuSuccess) {
                     this.showFeishuSuccess();
                 } else if (data.feishuStatus === 'skipped') {

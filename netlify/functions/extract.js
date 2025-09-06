@@ -377,7 +377,14 @@ exports.handler = async (event, context) => {
       }
     }
 
-    console.log("extract end", { requestId, written: feishuSuccess ? 1 : 0 });
+    const configStatus = {
+      hasAppId: !!appId,
+      hasAppSecret: !!appSecret,
+      hasTableId: !!tableId,
+      hasBitableAppToken: !!bitableAppToken
+    };
+
+    console.log("extract end", { requestId, written: feishuSuccess ? 1 : 0, configStatus });
     
     return {
       statusCode: 200,
@@ -389,7 +396,8 @@ exports.handler = async (event, context) => {
         results: websiteInfo,
         feishuSuccess: feishuSuccess,
         feishuStatus,
-        feishuMessage
+        feishuMessage,
+        configStatus
       })
     };
 
