@@ -198,9 +198,21 @@ async function writeToFeishu(data, cfg) {
     // 查询表格字段，做动态字段映射，避免因列名不一致写入失败
     let fieldNames = [];
     try {
-      const appTokenPreview = cfg.bitableAppToken || cfg.appId;
+      // 先解析可能的 wiki 节点 token 为真实 Bitable App Token
+      let appTokenForQuery = cfg.bitableAppToken || cfg.appId;
+      try {
+        const nodeResp = await axios.get('https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node', {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+          params: { token: appTokenForQuery, obj_type: 'wiki' }
+        });
+        if (nodeResp.data?.code === 0 && nodeResp.data?.data?.node?.obj_type === 'bitable') {
+          appTokenForQuery = nodeResp.data.data.node.obj_token;
+          console.log('解析到真实Bitable App Token(字段查询阶段):', appTokenForQuery);
+        }
+      } catch (_) {}
+
       const fieldsResp = await axios.get(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${appTokenPreview}/tables/${tableId}/fields`,
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${appTokenForQuery}/tables/${tableId}/fields`,
         { headers: { 'Authorization': `Bearer ${accessToken}` } }
       );
       if (fieldsResp.data?.code === 0) {
@@ -246,7 +258,8 @@ async function writeToFeishu(data, cfg) {
       extractedAt: new Date().toISOString()
     });
 
-    // 如果没有获取到字段列表或完全匹配不到，则回退到默认字段集（可能失败，但至少尝试）
+    // 如果没有获取到字段列表或完全匹配不到，则回退到默认字段集（包含 
+    // “来自 gpt 的输出” 兜底，保证至少能写到该列）
     if (Object.keys(fieldsToWrite).length === 0) {
       fieldsToWrite['网站URL']   = data.url || '';
       fieldsToWrite['公司名称']   = data.companyName || '';
@@ -257,6 +270,17 @@ async function writeToFeishu(data, cfg) {
       fieldsToWrite['Instagram'] = data.instagram?.join(', ') || '';
       fieldsToWrite['Facebook']  = data.facebook?.join(', ') || '';
       fieldsToWrite['提取时间']   = new Date().toISOString();
+      fieldsToWrite['来自 gpt 的输出'] = JSON.stringify({
+        url: data.url,
+        companyName: data.companyName,
+        description: data.description,
+        address: data.address,
+        email: data.email,
+        phone: data.phone,
+        instagram: data.instagram,
+        facebook: data.facebook,
+        extractedAt: new Date().toISOString()
+      });
     }
 
     const recordData = { fields: fieldsToWrite };
