@@ -38,7 +38,7 @@ async function readUserConfig(context) {
   }
 }
 
-// 提取网站信息
+// 提取网站信息 - 优化版本
 async function extractWebsiteInfo(url) {
   try {
     console.log('开始提取网站信息:', url);
@@ -52,63 +52,141 @@ async function extractWebsiteInfo(url) {
 
     const $ = cheerio.load(response.data);
     
-    // 提取公司名称
+    // 提取公司名称 - 优化选择器和清理逻辑
     let companyName = '';
-    const titleSelectors = ['title', 'h1', '.company-name', '.brand', '.logo-text'];
+    const titleSelectors = [
+      'meta[property="og:title"]',
+      'meta[name="twitter:title"]', 
+      'title',
+      'h1',
+      '.company-name',
+      '.brand',
+      '.logo-text',
+      '.site-title',
+      '.business-name',
+      '[class*="brand"]',
+      '[class*="company"]'
+    ];
+    
     for (const selector of titleSelectors) {
       const element = $(selector).first();
       if (element.length) {
-        companyName = element.text().trim();
-        if (companyName) break;
+        let text = element.attr('content') || element.text().trim();
+        // 清理标题中的常见后缀
+        text = text.replace(/\s*[-|]\s*(Home|Official|Website|Store|Shop|Jewellery|Jewelry).*$/i, '');
+        text = text.replace(/\s*[-|]\s*.*$/i, ''); // 移除破折号后的所有内容
+        if (text && text.length > 2 && text.length < 100) {
+          companyName = text;
+          break;
+        }
       }
     }
 
-    // 提取描述
+    // 提取描述 - 优化选择器和内容清理
     let description = '';
-    const descSelectors = ['meta[name="description"]', 'meta[property="og:description"]', '.description', '.about-text'];
+    const descSelectors = [
+      'meta[name="description"]',
+      'meta[property="og:description"]',
+      'meta[name="twitter:description"]',
+      '.description',
+      '.about-text',
+      '.intro',
+      '.summary',
+      '[class*="about"]',
+      '[class*="intro"]'
+    ];
+    
     for (const selector of descSelectors) {
       const element = $(selector).first();
       if (element.length) {
-        description = element.attr('content') || element.text().trim();
-        if (description) break;
+        let text = element.attr('content') || element.text().trim();
+        // 清理描述内容
+        text = text.replace(/\s+/g, ' ').trim();
+        if (text && text.length > 10 && text.length < 500) {
+          description = text;
+          break;
+        }
       }
     }
 
-    // 提取地址
+    // 提取地址 - 增强选择器和模式匹配
     let address = '';
-    const addressSelectors = ['.address', '.location', '[class*="address"]', '[class*="location"]'];
+    const addressSelectors = [
+      '.address',
+      '.location',
+      '.contact-address',
+      '.business-address',
+      '[class*="address"]',
+      '[class*="location"]',
+      '[class*="contact"]'
+    ];
+    
     for (const selector of addressSelectors) {
       const element = $(selector).first();
       if (element.length) {
-        address = element.text().trim();
-        if (address) break;
+        let text = element.text().trim();
+        // 验证是否为有效地址（包含数字、街道关键词等）
+        if (text && (/\d/.test(text) || /street|road|avenue|lane|drive|way|centre|center/i.test(text))) {
+          address = text.replace(/\s+/g, ' ').trim();
+          break;
+        }
       }
     }
 
-    // 提取邮箱
+    // 如果没有找到结构化地址，尝试从页面文本中提取
+    if (!address) {
+      const addressRegex = /(?:Address|Location|Contact)[:\s]*([^.\n]{20,200})/gi;
+      const addressMatch = response.data.match(addressRegex);
+      if (addressMatch) {
+        address = addressMatch[0].replace(/^(?:Address|Location|Contact)[:\s]*/i, '').trim();
+      }
+    }
+
+    // 提取邮箱 - 优化正则表达式和优先级
     let email = '';
     const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
     const emailMatches = response.data.match(emailRegex);
     if (emailMatches && emailMatches.length > 0) {
-      email = emailMatches[0];
+      // 优先选择非通用邮箱（排除noreply、admin等）
+      const preferredEmails = emailMatches.filter(email => 
+        !/noreply|no-reply|admin|info@|contact@|support@/i.test(email)
+      );
+      email = preferredEmails.length > 0 ? preferredEmails[0] : emailMatches[0];
     }
 
-    // 提取电话
+    // 提取电话 - 优化正则表达式和格式清理
     let phone = '';
-    const phoneRegex = /(\+?[\d\s\-\(\)]{7,})/g;
+    const phoneRegex = /(?:\+?353\s*)?(?:\(0\)\s*)?(?:0\s*)?[1-9]\d{1,3}\s*\d{3,4}\s*\d{3,4}/g;
     const phoneMatches = response.data.match(phoneRegex);
     if (phoneMatches && phoneMatches.length > 0) {
-      phone = phoneMatches[0].replace(/\s+/g, ' ').trim();
+      // 清理和格式化电话号码
+      phone = phoneMatches[0]
+        .replace(/\s+/g, ' ')
+        .replace(/\(0\)/g, '')
+        .trim();
+      
+      // 如果是爱尔兰号码，确保格式正确
+      if (phone.startsWith('0') && !phone.startsWith('+353')) {
+        phone = '+353 ' + phone.substring(1);
+      } else if (!phone.startsWith('+')) {
+        phone = '+353 ' + phone;
+      }
     }
 
-    // 提取社交媒体链接
+    // 提取社交媒体链接 - 优化选择器和URL处理
     const socialLinks = {
       instagram: [],
       facebook: []
     };
 
-    // 优先从header、footer、浮动元素中查找
-    const prioritySelectors = ['header', 'footer', '.social', '.social-links', '.floating', '.fixed'];
+    // 优先从header、footer、导航等区域查找
+    const prioritySelectors = [
+      'header', 'footer', 'nav', 
+      '.social', '.social-links', '.social-media',
+      '.floating', '.fixed', '.contact',
+      '[class*="social"]', '[class*="contact"]'
+    ];
+    
     for (const selector of prioritySelectors) {
       const container = $(selector);
       if (container.length) {
@@ -116,10 +194,20 @@ async function extractWebsiteInfo(url) {
         links.each((i, el) => {
           const href = $(el).attr('href');
           if (href) {
+            let cleanUrl = href;
+            // 清理URL
             if (href.includes('instagram.com')) {
-              socialLinks.instagram.push(href);
+              cleanUrl = href.replace(/\/$/, ''); // 移除末尾斜杠
+              if (!cleanUrl.startsWith('http')) {
+                cleanUrl = 'https://' + cleanUrl.replace(/^\/+/, '');
+              }
+              socialLinks.instagram.push(cleanUrl);
             } else if (href.includes('facebook.com')) {
-              socialLinks.facebook.push(href);
+              cleanUrl = href.replace(/\/$/, ''); // 移除末尾斜杠
+              if (!cleanUrl.startsWith('http')) {
+                cleanUrl = 'https://' + cleanUrl.replace(/^\/+/, '');
+              }
+              socialLinks.facebook.push(cleanUrl);
             }
           }
         });
@@ -132,18 +220,48 @@ async function extractWebsiteInfo(url) {
       allLinks.each((i, el) => {
         const href = $(el).attr('href');
         if (href) {
+          let cleanUrl = href;
           if (href.includes('instagram.com')) {
-            socialLinks.instagram.push(href);
+            cleanUrl = href.replace(/\/$/, '');
+            if (!cleanUrl.startsWith('http')) {
+              cleanUrl = 'https://' + cleanUrl.replace(/^\/+/, '');
+            }
+            socialLinks.instagram.push(cleanUrl);
           } else if (href.includes('facebook.com')) {
-            socialLinks.facebook.push(href);
+            cleanUrl = href.replace(/\/$/, '');
+            if (!cleanUrl.startsWith('http')) {
+              cleanUrl = 'https://' + cleanUrl.replace(/^\/+/, '');
+            }
+            socialLinks.facebook.push(cleanUrl);
           }
         }
       });
     }
 
-    // 去重
+    // 去重和清理
     socialLinks.instagram = [...new Set(socialLinks.instagram)];
     socialLinks.facebook = [...new Set(socialLinks.facebook)];
+
+    // 提取国家信息（基于地址或域名）
+    let country = '';
+    if (address) {
+      if (/ireland|dublin|cork|limerick|galway|waterford/i.test(address)) {
+        country = 'Ireland';
+      }
+    } else if (url.includes('.ie')) {
+      country = 'Ireland';
+    }
+
+    console.log('提取结果:', {
+      companyName: companyName ? companyName.substring(0, 50) + '...' : '未找到',
+      description: description ? description.substring(0, 100) + '...' : '未找到',
+      address: address ? address.substring(0, 100) + '...' : '未找到',
+      email: email || '未找到',
+      phone: phone || '未找到',
+      instagram: socialLinks.instagram.length,
+      facebook: socialLinks.facebook.length,
+      country: country || '未确定'
+    });
 
     return {
       url: url,
@@ -153,7 +271,8 @@ async function extractWebsiteInfo(url) {
       email: email,
       phone: phone,
       instagram: socialLinks.instagram,
-      facebook: socialLinks.facebook
+      facebook: socialLinks.facebook,
+      country: country
     };
   } catch (error) {
     console.error('提取网站信息失败:', error.message);
@@ -228,6 +347,7 @@ async function writeToFeishu(data, cfg) {
     const mapUrl        = pickName('网站URL','官网地址','网站地址','链接','URL');
     const mapName       = pickName('公司名称','公司名','品牌','名称','店铺名称');
     const mapDesc       = pickName('描述','简介','公司简介');
+    const mapCountry    = pickName('Country','国家','地区','国家地区');
     const mapAddr       = pickName('地址','公司地址','联系地址','所在地');
     const mapEmail      = pickName('邮箱','Email','电子邮箱');
     const mapPhone      = pickName('电话','Phone','联系电话');
@@ -240,6 +360,7 @@ async function writeToFeishu(data, cfg) {
     if (mapUrl)       fieldsToWrite[mapUrl] = data.url || '';
     if (mapName)      fieldsToWrite[mapName] = data.companyName || '';
     if (mapDesc)      fieldsToWrite[mapDesc] = data.description || '';
+    if (mapCountry)   fieldsToWrite[mapCountry] = data.country || '';
     if (mapAddr)      fieldsToWrite[mapAddr] = data.address || '';
     if (mapEmail)     fieldsToWrite[mapEmail] = data.email || '';
     if (mapPhone)     fieldsToWrite[mapPhone] = data.phone || '';
@@ -259,11 +380,12 @@ async function writeToFeishu(data, cfg) {
     });
 
     // 如果没有获取到字段列表或完全匹配不到，则回退到默认字段集（包含 
-    // “来自 gpt 的输出” 兜底，保证至少能写到该列）
+    // "来自 gpt 的输出" 兜底，保证至少能写到该列）
     if (Object.keys(fieldsToWrite).length === 0) {
       fieldsToWrite['网站URL']   = data.url || '';
       fieldsToWrite['公司名称']   = data.companyName || '';
       fieldsToWrite['描述']     = data.description || '';
+      fieldsToWrite['Country']  = data.country || '';
       fieldsToWrite['地址']     = data.address || '';
       fieldsToWrite['邮箱']     = data.email || '';
       fieldsToWrite['电话']     = data.phone || '';
@@ -274,6 +396,7 @@ async function writeToFeishu(data, cfg) {
         url: data.url,
         companyName: data.companyName,
         description: data.description,
+        country: data.country,
         address: data.address,
         email: data.email,
         phone: data.phone,
