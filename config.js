@@ -19,6 +19,8 @@ class ConfigManager {
     init() {
         this.bindEvents();
         this.loadConfig(); // 页面加载时自动加载配置
+        // 初始化预览
+        setTimeout(() => this.updatePreview(), 0);
     }
     
     // 绑定事件
@@ -29,6 +31,21 @@ class ConfigManager {
                 e.preventDefault();
                 this.saveConfig();
             });
+        }
+
+        // 实时解析预览
+        ['appId','appSecret','bitableUrl'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', () => this.updatePreview());
+                el.addEventListener('blur', () => this.updatePreview());
+            }
+        });
+
+        // 一键验证
+        const pvBtn = document.getElementById('pvValidateBtn');
+        if (pvBtn) {
+            pvBtn.addEventListener('click', () => this.validatePreview());
         }
     }
     
@@ -88,6 +105,7 @@ class ConfigManager {
             
             // 本地优先：不再依赖服务器保存个人配置
             this.showStatus('配置已保存（本地）。提取时将直接使用本地配置写入飞书。', 'success');
+            this.updatePreview();
             
             // 3秒后自动返回主页
             setTimeout(() => {
@@ -97,6 +115,80 @@ class ConfigManager {
         } catch (error) {
             console.error('保存配置失败:', error);
             this.showStatus('保存配置失败: ' + error.message, 'error');
+        }
+    }
+
+    // 更新解析预览
+    updatePreview() {
+        const url = (document.getElementById('bitableUrl')?.value || '').trim();
+        const appId = (document.getElementById('appId')?.value || '').trim();
+        const appSecret = (document.getElementById('appSecret')?.value || '').trim();
+
+        const tableId = url ? this.extractTableIdFromUrl(url) : '';
+        const appToken = url ? this.extractAppTokenFromUrl(url) : '';
+
+        const pvTable = document.getElementById('pvTableId');
+        const pvToken = document.getElementById('pvAppToken');
+        const pvStatus = document.getElementById('pvStatus');
+        if (pvTable) pvTable.value = tableId || '-';
+        if (pvToken) pvToken.value = appToken || '-';
+
+        const okTable = !!(tableId && tableId.startsWith('tbl'));
+        const okId = !!appId;
+        const okSecret = !!appSecret;
+        const basic = okTable && okId && okSecret;
+        if (pvStatus) {
+            pvStatus.style.display = 'flex';
+            pvStatus.className = 'status-message ' + (basic ? 'status-success' : 'status-info');
+            pvStatus.textContent = basic ? '解析正常：可点击“验证”进行线上校验' : '请填写 AppID/Secret，并确保链接里含有 table=tbl...';
+        }
+    }
+
+    // 线上校验 AppID/Secret + App Token
+    async validatePreview() {
+        const appId = (document.getElementById('appId')?.value || '').trim();
+        const appSecret = (document.getElementById('appSecret')?.value || '').trim();
+        const appToken = (document.getElementById('pvAppToken')?.value || '').trim();
+        const tableId = (document.getElementById('pvTableId')?.value || '').trim();
+        const pvStatus = document.getElementById('pvStatus');
+        if (!appId || !appSecret) {
+            if (pvStatus) { pvStatus.className = 'status-message status-error'; pvStatus.textContent = '请先填写 App ID 与 App Secret'; }
+            return;
+        }
+        if (!tableId || !tableId.startsWith('tbl')) {
+            if (pvStatus) { pvStatus.className = 'status-message status-error'; pvStatus.textContent = '无法解析 Table ID，请检查链接'; }
+            return;
+        }
+        try {
+            if (pvStatus) { pvStatus.className = 'status-message status-info'; pvStatus.textContent = '正在获取访问令牌...'; }
+            const tkResp = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ app_id: appId, app_secret: appSecret })
+            });
+            const tkData = await tkResp.json();
+            if (tkData.code !== 0 || !tkData.tenant_access_token) {
+                throw new Error('获取访问令牌失败: ' + (tkData.msg || 'unknown'));
+            }
+            if (pvStatus) { pvStatus.textContent = '访问令牌获取成功，校验 App Token...'; }
+            // 校验 appToken（如果解析到了）
+            let tokenToCheck = appToken;
+            if (!tokenToCheck) {
+                // 无 appToken 也允许，只做 tableId 结构校验
+                if (pvStatus) { pvStatus.className = 'status-message status-success'; pvStatus.textContent = '已验证：AppID/Secret 有效，Table ID 格式正确'; }
+                return;
+            }
+            const appResp = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${tokenToCheck}`, {
+                headers: { 'Authorization': `Bearer ${tkData.tenant_access_token}` }
+            });
+            const appJson = await appResp.json();
+            if (appJson.code === 0) {
+                if (pvStatus) { pvStatus.className = 'status-message status-success'; pvStatus.textContent = '验证成功：App Token 有效，Table ID 格式正确'; }
+            } else {
+                if (pvStatus) { pvStatus.className = 'status-message status-error'; pvStatus.textContent = `验证失败：App Token 无效（${appJson.msg || appJson.code}）`; }
+            }
+        } catch (e) {
+            console.error('预览验证失败:', e);
+            if (pvStatus) { pvStatus.className = 'status-message status-error'; pvStatus.textContent = '验证失败：' + (e.message || '网络错误'); }
         }
     }
 

@@ -232,6 +232,31 @@
                 </button>
             </div>
         </form>
+
+        <!-- 解析预览 -->
+        <div class="security-info preview-panel" id="previewPanel">
+            <h3>
+                <i class="fas fa-eye"></i>
+                解析预览 / 一键验证
+            </h3>
+            <p style="margin-top: 6px;">
+                下面会实时解析你填写的多维表格链接，提取表格ID与App Token；可点“验证”用 AppID/Secret 获取访问令牌并校验 Token 是否有效。
+            </p>
+            <div class="form-group" style="margin-top: 12px;">
+                <label>解析到的 Table ID</label>
+                <input id="pvTableId" type="text" readonly value="-" />
+            </div>
+            <div class="form-group">
+                <label>解析到的 App Token</label>
+                <input id="pvAppToken" type="text" readonly value="-" />
+            </div>
+            <div class="config-buttons" style="margin-top: 10px;">
+                <button type="button" class="btn btn-secondary" id="pvValidateBtn">
+                    <i class="fas fa-check"></i> 验证 App & Token
+                </button>
+            </div>
+            <div class="status-message status-info" id="pvStatus" style="display:none;margin-top:10px;">准备就绪</div>
+        </div>
         
         <div class="status-message" id="statusMessage"></div>
         
@@ -251,5 +276,5 @@
     <!-- Netlify Identity widget is required so config.js can detect currentUser() and save personal config -->
     <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
     <script src="config.js"></script>
-  </body>
+    </body>
 </html>

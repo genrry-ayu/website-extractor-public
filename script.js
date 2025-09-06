@@ -35,31 +35,31 @@ class WebsiteExtractor {
         return '/api/extract';
     }
 
-    // 获取飞书配置
+    // 获取飞书配置（本地加密存储）
     getFeishuConfig() {
         try {
-            // 从localStorage获取加密的配置
             const encryptedData = localStorage.getItem('feishu_config_encrypted');
             if (!encryptedData) {
                 console.log('未找到飞书配置');
                 return null;
             }
 
-            // 解密配置
-            const config = this.decryptConfig(encryptedData);
-            console.log('获取到飞书配置:', { 
-                feishuAppId: config.appId, 
-                feishuAppSecret: config.appSecret ? (config.appSecret.substring(0, 10) + '...') : '未设置', 
-                feishuTableId: config.bitableUrl 
+            const cfg = this.decryptConfig(encryptedData);
+            const tableId = this.extractTableIdFromUrl(cfg.bitableUrl);
+            const appToken = this.extractAppTokenFromUrl(cfg.bitableUrl);
+
+            console.log('获取到飞书配置(本地):', {
+                appId: cfg.appId,
+                appSecret: cfg.appSecret ? (cfg.appSecret.substring(0, 3) + '***' + cfg.appSecret.slice(-2)) : '未设置',
+                tableId,
+                appToken
             });
-            
-            // 检查App Secret长度
-            if (config.appSecret && config.appSecret.length < 20) {
-                console.warn('警告: App Secret长度异常，可能配置有误');
-            }
-            
+
             return {
-                feishuTableId: this.extractTableIdFromUrl(config.bitableUrl)
+                appId: cfg.appId,
+                appSecret: cfg.appSecret,
+                tableId,
+                bitableAppToken: appToken
             };
         } catch (error) {
             console.error('获取飞书配置失败:', error);
