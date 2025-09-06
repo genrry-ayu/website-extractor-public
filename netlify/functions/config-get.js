@@ -48,7 +48,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 200,
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ ok:true, config: { appId: cfg.appId, appSecret: mask(cfg.appSecret), tableId: cfg.tableId } })
+      body: JSON.stringify({ ok:true, config: { appId: cfg.appId, appSecret: mask(cfg.appSecret), tableId: cfg.tableId, bitableAppToken: cfg.bitableAppToken } })
     };
   } catch (e) {
     console.error('config-get internal error:', String(e));

@@ -168,6 +168,7 @@ async function writeToFeishu(data, cfg) {
     console.log('使用配置:', {
       appId: cfg.appId,
       tableId: cfg.tableId,
+      bitableAppToken: cfg.bitableAppToken ? mask(cfg.bitableAppToken) : undefined,
       appSecret: mask(cfg.appSecret)
     });
 
@@ -215,8 +216,9 @@ async function writeToFeishu(data, cfg) {
     // 尝试写入记录
     let writeResponse;
     try {
+      const appToken = cfg.bitableAppToken || cfg.appId; // 兼容旧配置，优先使用bitableAppToken
       writeResponse = await axios.post(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${cfg.appId}/tables/${tableId}/records`,
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`,
         recordData,
         {
           headers: {
@@ -268,17 +270,36 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // 校验 URL 格式，尽早返回明确错误而不是 500
+    try {
+      // 仅用于校验格式，不覆盖原始字符串
+      // eslint-disable-next-line no-new
+      new URL(url);
+    } catch (_) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          ok: false,
+          error: 'invalid_url',
+          message: 'Invalid URL format'
+        })
+      };
+    }
+
     // 1) 登录用户 → 读私有配置；2) 未登录/无私有配置 → 用 ENV；允许仅 tableId 从 body 覆盖
     const userCfg = await readUserConfig(context);
-    const appId     = (userCfg && userCfg.appId)     || process.env.FEISHU_APP_ID;
-    const appSecret = (userCfg && userCfg.appSecret) || process.env.FEISHU_APP_SECRET;
-    const tableId   = (userCfg && userCfg.tableId)   || body?.feishuConfig?.tableId || process.env.FEISHU_TABLE_ID;
+    const appId            = (userCfg && userCfg.appId)            || process.env.FEISHU_APP_ID;
+    const appSecret        = (userCfg && userCfg.appSecret)        || process.env.FEISHU_APP_SECRET;
+    const tableId          = (userCfg && userCfg.tableId)          || body?.feishuConfig?.tableId || process.env.FEISHU_TABLE_ID;
+    const bitableAppToken  = (userCfg && userCfg.bitableAppToken)  || body?.feishuConfig?.bitableAppToken || process.env.FEISHU_BITABLE_APP_TOKEN;
 
     console.log('配置状态:', {
       hasUserCfg: !!userCfg,
       hasAppId: !!appId,
       hasAppSecret: !!appSecret,
       hasTableId: !!tableId,
+      hasBitableAppToken: !!bitableAppToken,
       tableId: tableId
     });
 
@@ -290,20 +311,34 @@ exports.handler = async (event, context) => {
           ok: false,
           error: "missing_config",
           message: "缺少必要的飞书配置",
-          fields: { appId: !!appId, appSecret: !!appSecret, tableId: !!tableId }
+          fields: { appId: !!appId, appSecret: !!appSecret, tableId: !!tableId, bitableAppToken: !!bitableAppToken }
         })
       };
     }
 
     console.log("extract start", { requestId, hasUserCfg: !!userCfg, tableId });
 
-    // 提取网站信息
-    const websiteInfo = await extractWebsiteInfo(url);
+    // 提取网站信息（单独捕获以避免返回泛化的 500）
+    let websiteInfo;
+    try {
+      websiteInfo = await extractWebsiteInfo(url);
+    } catch (extractErr) {
+      console.error('信息提取错误:', extractErr);
+      return {
+        statusCode: 502,
+        headers,
+        body: JSON.stringify({
+          ok: false,
+          error: 'fetch_failed',
+          message: extractErr?.message || 'Failed to fetch target URL'
+        })
+      };
+    }
 
     // 尝试写入飞书多维表格
     let feishuSuccess = false;
     try {
-      feishuSuccess = await writeToFeishu(websiteInfo, { appId, appSecret, tableId });
+      feishuSuccess = await writeToFeishu(websiteInfo, { appId, appSecret, tableId, bitableAppToken });
       console.log('飞书写入结果:', feishuSuccess);
     } catch (feishuError) {
       console.error('飞书写入失败:', feishuError.message);

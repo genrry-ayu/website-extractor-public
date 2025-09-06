@@ -25,15 +25,16 @@ exports.handler = async (event, context) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
-    const appId     = body.appId     || body.feishuAppId;
-    const appSecret = body.appSecret || body.feishuAppSecret;
-    const tableId   = body.tableId   || body.feishuTableId;
+    const appId            = body.appId            || body.feishuAppId;
+    const appSecret        = body.appSecret        || body.feishuAppSecret;
+    const tableId          = body.tableId          || body.feishuTableId;
+    const bitableAppToken  = body.bitableAppToken  || body.feishuBitableAppToken || body.appToken;
     if (!appId || !appSecret || !tableId) {
       return { statusCode: 400, body: JSON.stringify({ ok:false, error:'missing_fields' }) };
     }
 
     const store = getStore({ name: 'feishu-configs' });
-    await store.set(user.sub, encrypt({ appId, appSecret, tableId }));
+    await store.set(user.sub, encrypt({ appId, appSecret, tableId, bitableAppToken }));
 
     return { statusCode: 200, body: JSON.stringify({ ok:true }) };
   } catch (e) {

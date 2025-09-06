@@ -16,6 +16,7 @@ exports.handler = async (event, context) => {
     const hasAppSecret = !!process.env.FEISHU_APP_SECRET;
     const hasTableId = !!process.env.FEISHU_TABLE_ID;
     const hasEncKey = !!process.env.CONFIG_ENC_KEY;
+    const hasBitableAppToken = !!process.env.FEISHU_BITABLE_APP_TOKEN;
 
     return {
       statusCode: 200,
@@ -27,7 +28,8 @@ exports.handler = async (event, context) => {
           hasAppId,
           hasAppSecret,
           hasTableId,
-          hasEncKey
+          hasEncKey,
+          hasBitableAppToken
         },
         message: 'Health check passed'
       })
